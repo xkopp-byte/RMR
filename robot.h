@@ -52,6 +52,20 @@ private:
   double forwardspeed;  // mm/s
   double rotationspeed; // omega/s
 
+
+  float distance_whole_meter = 0;
+  float left_wheel[10] = {0};
+  float right_wheel[10] = {0};  
+  float phi = 0;
+  uint8_t increment = 0;
+  float       x_robot_last_position = 0;
+  float       y_robot_last_position = 0;    
+  float wheel_base_distance = 0.23; // vzdialenost medzi kolesami v metroch
+  float robot_radius = 0.11;
+  float gyro_actual[10] = {0};
+  float gyro_rads_prev = 0;
+
+
   /// toto su callbacky co sa sa volaju s novymi datami
   int processThisLidar(const std::vector<LaserData> &laserData);
   int processThisRobot(const TKobukiData &robotdata);
