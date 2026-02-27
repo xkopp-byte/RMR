@@ -13,7 +13,7 @@ if(NOT DISABLE_JOYSTICK)
     add_compile_definitions(USING_QJOYSTICKS)
 endif()
 
-qt_add_executable(${PROJECT_NAME} WIN32
+add_executable(${PROJECT_NAME} WIN32
     ${SOURCES}
     ${HEADERS}
     mainwindow.ui

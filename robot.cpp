@@ -38,11 +38,34 @@ void robot::setSpeedVal(double forw, double rots)
     rotationspeed=rots;
     useDirectCommands=0;
 }
-float robot::curve_modulation(float low, float high)
+
+double robot::curve_modulation(double low, double high) // TODO, ale nepredbiehajme ...
 {
-    //dokoncit S krivku 
-    //mind toto bude volane asi kazdy refresh robota, preto treba 
-    return high;
+    double actual_speed = low;
+    if (curve_state == CURVE_FINAL)
+    {
+        return high;
+    }
+    else if (curve_state == CURVE_CHANGING)
+    {
+        actual_speed = low + (high - low) * (1.0001 - 1 /static_cast<double>(curve_steps));
+        curve_steps++;
+        if (curve_steps > 10)
+        {
+            curve_state = CURVE_FINAL;
+            curve_steps = 0;
+        }
+    }
+
+    return actual_speed;
+}
+
+double robot::regulator(double error)
+{
+    forwardspeed = 0; // ??
+    rotationspeed = 0; // ??
+    curve_state = CURVE_CHANGING; // este neviem kedy to zapnut
+    return 0; 
 }
 
 void robot::setSpeed(double forw, double rots)
@@ -64,43 +87,71 @@ void robot::setSpeed(double forw, double rots)
 /// vola sa vzdy ked dojdu nove data z robota. nemusite nic riesit, proste sa to stane
 int robot::processThisRobot(const TKobukiData &robotdata)
 {
-    //rad by som spravil zmeny rychlosti kazdych 0.25 sekundy ked uz zacne robit jednu zmenu. aby sa ta s krivka aj prejavila 
-    //robot sa realne zacne hybat okolo desiny rychlosti
-    //od rychlosti 30 sa zacne robot spravat stabilnejsie, skok z pokoja na 30 moze byr rychlejsi a robot nebude presmykovat
-
-    left_wheel[increment]=robotdata.EncoderLeft* robot.gettickToMeter;
-    right_wheel[increment]=robotdata.EncoderRight* robot.gettickToMeter;
-    gyro_actual[increment] = robotdata.GyroAngle;
-    float gyro_rads = robotdata.GyroAngle
-    float gyro_rads_prev = gyro_actual[(increment + 9) % 10];
-
-    
-    x_robot_last_position = x_robot_last_position  + ((wheel_base_distance * (left_wheel[increment] + right_wheel[increment]))
-                                                   / (                   2 * (left_wheel[increment] + right_wheel[increment])))
-                                                   * (sin(gyro_rads) - sin(gyro_rads_prev));
-    y_robot_last_position = y_robot_last_position  - ((wheel_base_distance * (left_wheel[increment] + right_wheel[increment]))
-                                                   / (                   2 * (left_wheel[increment] + right_wheel[increment])))
-                                                   * (cos(gyro_rads) - cos(gyro_rads_prev));
-    phi = gyro_rads;
-    
-    if (increment==9)
-        increment=0;
-        distance_whole_meter+=(sum(left_wheel, 10) + sum(right_wheel, 10)) / 2;
-        x_robot_last_position += (left_wheel_speed + right_wheel_speed) / 2 * cos(phi) * 0.025;
-        y_robot_last_position += (left_wheel_speed + right_wheel_speed) / 2 * sin(phi) * 0.025;
-    else
-        increment++;
-
-    float x_actual_positin = x_robot_last_position + (left_wheel_speed + right_wheel_speed) / 2 * cos(phi) * 0.025; 
-    float y_actual_position = y_robot_last_position + (left_wheel_speed + right_wheel_speed) / 2 * sin(phi) * 0.025;
+// JAKUB: toto som zatial zakomentoval, nech to nestratime, tym ze idem "prepisovat" main branch
+//     //rad by som spravil zmeny rychlosti kazdych 0.25 sekundy ked uz zacne robit jednu zmenu. aby sa ta s krivka aj prejavila 
+//     //robot sa realne zacne hybat okolo desiny rychlosti
+//     //od rychlosti 30 sa zacne robot spravat stabilnejsie, skok z pokoja na 30 moze byr rychlejsi a robot nebude presmykovat
+// 
+//     left_wheel[increment]=robotdata.EncoderLeft* robot.gettickToMeter;
+//     right_wheel[increment]=robotdata.EncoderRight* robot.gettickToMeter;
+//     gyro_actual[increment] = robotdata.GyroAngle;
+//     float gyro_rads = robotdata.GyroAngle
+//     float gyro_rads_prev = gyro_actual[(increment + 9) % 10];
+// 
+//     
+//     x_robot_last_position = x_robot_last_position  + ((wheel_base_distance * (left_wheel[increment] + right_wheel[increment]))
+//                                                    / (                   2 * (left_wheel[increment] + right_wheel[increment])))
+//                                                    * (sin(gyro_rads) - sin(gyro_rads_prev));
+//     y_robot_last_position = y_robot_last_position  - ((wheel_base_distance * (left_wheel[increment] + right_wheel[increment]))
+//                                                    / (                   2 * (left_wheel[increment] + right_wheel[increment])))
+//                                                    * (cos(gyro_rads) - cos(gyro_rads_prev));
+//     phi = gyro_rads;
+//     
+//     if (increment==9)
+//         increment=0;
+//         distance_whole_meter+=(sum(left_wheel, 10) + sum(right_wheel, 10)) / 2;
+//         x_robot_last_position += (left_wheel_speed + right_wheel_speed) / 2 * cos(phi) * 0.025;
+//         y_robot_last_position += (left_wheel_speed + right_wheel_speed) / 2 * sin(phi) * 0.025;
+//     else
+//         increment++;
+// 
+//     float x_actual_positin = x_robot_last_position + (left_wheel_speed + right_wheel_speed) / 2 * cos(phi) * 0.025; 
+//     float y_actual_position = y_robot_last_position + (left_wheel_speed + right_wheel_speed) / 2 * sin(phi) * 0.025;
 
     ///tu mozete robit s datami z robota
+    
+    // pri prvom spusteni callbacku treba ulozit pociatocne hodnoty gyra
+    if(first_reading_flag == true)
+    {
+        gyro_correction = robotdata.GyroAngle;
+        gyro_angle_prev = robotdata.GyroAngle - gyro_correction;
+        first_reading_flag = false;
+    }
 
+    enc_left = robotdata.EncoderLeft;
+    enc_right = robotdata.EncoderRight;
+    gyro_angle = robotdata.GyroAngle - gyro_correction;
 
+    enc_left_distance = enc_left * gettickToMeter();
+    enc_right_distance = enc_right * gettickToMeter();
 
+    // Vypocet novej pozicie X a Y
+    if(enc_left_distance == enc_right_distance) 
+    {
+        x_position += enc_left_distance * cos(gyro_angle);
+        y_position += enc_left_distance * sin(gyro_angle);
+    }
+    else
+    {
+        x_position += (wheel_base_distance*(enc_left_distance + enc_right_distance)) 
+                        / (2*(enc_right_distance - enc_left_distance)) 
+                        * (sin(gyro_angle) - sin(gyro_angle_prev));
+        y_position -= (wheel_base_distance*(enc_left_distance + enc_right_distance))
+                        / (2*(enc_right_distance - enc_left_distance)) 
+                        * (cos(gyro_angle) - cos(gyro_angle_prev));
+    }
 
-
-
+    // akcny_zasah = regulator() ... DOKONCIT
 
 
 ///TU PISTE KOD... TOTO JE TO MIESTO KED NEVIETE KDE ZACAT,TAK JE TO NAOZAJ TU. AK AJ TAK NEVIETE, SPYTAJTE SA CVICIACEHO MA TU NATO STRING KTORY DA DO HLADANIA XXX
