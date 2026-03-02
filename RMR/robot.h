@@ -81,7 +81,7 @@ private:
   double y_position = 0;
   double x_target = 0;
   double y_target = 0;
-  int curve_steps = 1
+  int curve_steps = 1;
  
 
   enum CURVE_STATE

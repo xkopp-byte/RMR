@@ -132,8 +132,8 @@ int robot::processThisRobot(const TKobukiData &robotdata)
     enc_right = robotdata.EncoderRight;
     gyro_angle = robotdata.GyroAngle - gyro_correction;
 
-    enc_left_distance = enc_left * gettickToMeter();
-    enc_right_distance = enc_right * gettickToMeter();
+    enc_left_distance = enc_left * robotCom.getTickToMeter();
+    enc_right_distance = enc_right * robotCom.getTickToMeter();
 
     // Vypocet novej pozicie X a Y
     if(enc_left_distance == enc_right_distance) 

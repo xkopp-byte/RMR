@@ -1,44 +1,23 @@
-set(SOURCES
-    main.cpp
-    mainwindow.cpp
-    robot.cpp
-)
+cmake_minimum_required(VERSION 3.16)
+project(RMR VERSION 1.0 LANGUAGES CXX)
 
-set(HEADERS
-    mainwindow.h
-    robot.h
-)
+option(DISABLE_OPENCV "Disable OpenCV support" ON)
+option(DISABLE_SKELETON "Disable skeleton module" OFF)
+option(DISABLE_JOYSTICK "Disable joystick support" ON)
 
-if(NOT DISABLE_JOYSTICK)
-    add_compile_definitions(USING_QJOYSTICKS)
-endif()
+set(CMAKE_AUTOUIC ON)
+set(CMAKE_AUTOMOC ON)
+set(CMAKE_AUTORCC ON)
+set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
-add_executable(${PROJECT_NAME} WIN32
-    ${SOURCES}
-    ${HEADERS}
-    mainwindow.ui
-)
+find_package(Qt6 REQUIRED COMPONENTS Core Widgets Gui Network)
 
-target_compile_definitions(${PROJECT_NAME} PRIVATE ROBOT_LIBRARY)
-if(DISABLE_OPENCV)
-    target_compile_definitions(${PROJECT_NAME} PRIVATE DISABLE_OPENCV)
-endif()
-if(DISABLE_SKELETON)
-    target_compile_definitions(${PROJECT_NAME} PRIVATE DISABLE_SKELETON)
-endif()
-if(DISABLE_JOYSTICK)
-    target_compile_definitions(${PROJECT_NAME} PRIVATE DISABLE_JOYSTICK)
-endif()
-
-target_link_libraries(${PROJECT_NAME} 
-    PRIVATE librobot::librobot
-    PRIVATE Qt6::Core Qt6::Widgets Qt6::Gui Qt6::Network
-)
+find_package(librobot REQUIRED)
 
 if(NOT DISABLE_JOYSTICK)
-    target_link_libraries(${PROJECT_NAME} PRIVATE QJoysticks::QJoysticksLib)
+    add_subdirectory(QJoysticks-master QJoysticks_build)
 endif()
 
-if(WIN32)
-    target_link_libraries(${PROJECT_NAME} PRIVATE ws2_32 Winmm)
-endif()
+add_subdirectory(RMR)

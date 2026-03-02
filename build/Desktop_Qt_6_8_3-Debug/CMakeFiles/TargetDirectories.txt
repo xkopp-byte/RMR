@@ -1,3 +1,7 @@
-/home/qweuror/FEI/ING/2_S/RMR/RMR/build/Desktop_Qt_6_8_3-Debug/CMakeFiles/Project.dir
 /home/qweuror/FEI/ING/2_S/RMR/RMR/build/Desktop_Qt_6_8_3-Debug/CMakeFiles/edit_cache.dir
 /home/qweuror/FEI/ING/2_S/RMR/RMR/build/Desktop_Qt_6_8_3-Debug/CMakeFiles/rebuild_cache.dir
+/home/qweuror/FEI/ING/2_S/RMR/RMR/build/Desktop_Qt_6_8_3-Debug/RMR/CMakeFiles/RMR.dir
+/home/qweuror/FEI/ING/2_S/RMR/RMR/build/Desktop_Qt_6_8_3-Debug/RMR/CMakeFiles/edit_cache.dir
+/home/qweuror/FEI/ING/2_S/RMR/RMR/build/Desktop_Qt_6_8_3-Debug/RMR/CMakeFiles/rebuild_cache.dir
+/home/qweuror/FEI/ING/2_S/RMR/RMR/build/Desktop_Qt_6_8_3-Debug/RMR/CMakeFiles/RMR_autogen_timestamp_deps.dir
+/home/qweuror/FEI/ING/2_S/RMR/RMR/build/Desktop_Qt_6_8_3-Debug/RMR/CMakeFiles/RMR_autogen.dir
