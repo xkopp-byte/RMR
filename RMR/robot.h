@@ -69,8 +69,13 @@ private:
 // // nase privat premenne ^^^^^^^^^^^^^^^^^
   double enc_left = 0;  /// rozsah IRC 0~65535 (2 byte) - TREBA OSETRIT PRETECIENIE
   double enc_right = 0;
+  double enc_left_prev = 0;  // Previous encoder values for delta calculation
+  double enc_right_prev = 0;
   double enc_left_distance = 0;
   double enc_right_distance = 0;
+  double delta_left_distance = 0;  // Distance traveled since last call
+  double delta_right_distance = 0;
+  double distance_traveled = 0;    // Total distance traveled since last call (average of both wheels)
   double gyro_angle = 0;  /// rozsah gyra -18000~18000 -> -180°~180° - TREBA OSETRIT PRETECIENIE
   double gyro_angle_prev = 0;
   bool first_reading_flag = true;
@@ -82,7 +87,45 @@ private:
   double x_target = 0;
   double y_target = 0;
   int curve_steps = 1;
- 
+
+  // S-curve velocity ramping parameters
+  double scurve_progress = 0.0;     // Current progress through S-curve (0 to 1)
+  double scurve_current_pct = 0.0;  // Current velocity as percentage (0 to 1)
+  double scurve_target_pct = 0.0;   // Target velocity as percentage (0 to 1)
+  double scurve_start_pct = 0.0;    // Starting velocity percentage when ramp began
+  int scurve_total_steps = 20;      // Total steps to complete S-curve ramp
+  int scurve_current_step = 0;      // Current step in the ramp
+  bool scurve_active = false;       // Is S-curve ramping active
+
+  // PI regulator parameters
+  double Kp = 1.5;           // Proportional gain
+  double Ki = 0.05;          // Integral gain
+  double integral_error = 0; // Accumulated integral error
+  double max_integral = 100; // Anti-windup limit
+  double max_rotation_speed = 180; // max rotation speed deg/s
+  double min_forward_speed = 50;   // minimum forward speed mm/s
+  double max_forward_speed = 200;  // maximum forward speed mm/s
+  double target_tolerance = 0.05;  // target reach tolerance in meters
+  
+  // Arc trajectory variables
+  double arc_radius = 0;     // Current arc radius
+  double angle_to_target = 0; // Angle from robot to target
+  double heading_error = 0;   // Error between current heading and target angle
+  int current_target_index = 0; // Index in target array
+
+  // Helper functions for PI regulation
+  double calculateAngleToTarget(double x_curr, double y_curr, double x_tgt, double y_tgt);
+  double normalizeAngle(double angle);
+  double piRegulator(double error);
+  void updateArcTrajectory();
+  
+  // Odometry function - calculates position and distance traveled since last call
+  void updateOdometry(const TKobukiData &robotdata);
+  
+  // S-curve velocity ramping function
+  double sCurveRamp(double current_pct, double target_pct);
+  void startSCurveRamp(double target_pct, int steps = 20);
+  double smootherstep(double t);
 
   enum CURVE_STATE
   {
