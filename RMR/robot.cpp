@@ -68,73 +68,6 @@ double robot::regulator(double error)
     return 0; 
 }
 
-// Smootherstep function (Ken Perlin's improved smoothstep)
-// Returns S-curve value for t in [0, 1]
-// Pattern: slow start -> fast middle -> slow end
-double robot::smootherstep(double t)
-{
-    if (t <= 0.0) return 0.0;
-    if (t >= 1.0) return 1.0;
-    // 6t^5 - 15t^4 + 10t^3
-    return t * t * t * (t * (t * 6.0 - 15.0) + 10.0);
-}
-
-// Start a new S-curve ramp to target percentage
-// target_pct: target velocity as percentage (0 to 1)
-// steps: number of steps to complete the ramp (default 20)
-void robot::startSCurveRamp(double target_pct, int steps)
-{
-    scurve_target_pct = target_pct;
-    scurve_total_steps = steps;
-    scurve_current_step = 0;
-    scurve_active = true;
-    // scurve_current_pct remains at current value for smooth transition
-}
-
-// S-curve velocity ramping function
-// Returns percentage (0 to 1) that should be applied to velocities
-// Maintains ratio between forward and rotation speeds for arc trajectories
-double robot::sCurveRamp(double current_pct, double target_pct)
-{
-    // If target changed, start new ramp
-    if (fabs(scurve_target_pct - target_pct) > 0.001)
-    {
-        startSCurveRamp(target_pct);
-        scurve_start_pct = current_pct; // Store starting percentage
-    }
-    
-    // If not ramping or already at target, return target
-    if (!scurve_active || fabs(current_pct - target_pct) < 0.001)
-    {
-        scurve_active = false;
-        return target_pct;
-    }
-    
-    // Increment step
-    scurve_current_step++;
-    
-    // Calculate progress through S-curve (0 to 1)
-    scurve_progress = static_cast<double>(scurve_current_step) / static_cast<double>(scurve_total_steps);
-    if (scurve_progress > 1.0) scurve_progress = 1.0;
-    
-    // Apply smootherstep to get S-curve interpolation factor
-    double s_factor = smootherstep(scurve_progress);
-    
-    // Interpolate: start + (target - start) * s_factor
-    double new_pct = scurve_start_pct + (target_pct - scurve_start_pct) * s_factor;
-    
-    // Check if ramp is complete
-    if (scurve_current_step >= scurve_total_steps)
-    {
-        scurve_active = false;
-        scurve_current_step = 0;
-        new_pct = target_pct;
-    }
-    
-    return new_pct;
-}
-
-
 // Calculates angle from current position to target position
 double robot::calculateAngleToTarget(double x_curr, double y_curr, double x_tgt, double y_tgt)
 {
@@ -220,13 +153,13 @@ void robot::updateOdometry(const TKobukiData &robotdata)
     double gyro_rad_prev = gyro_angle_prev * M_PI / 18000.0;
 
     // Calculate new position X and Y using gyro for heading
-    if(fabs(delta_left_distance - delta_right_distance) < 0.0001) 
-    {
+    
         // Straight line motion
         x_position += distance_traveled * cos(gyro_rad);
         y_position += distance_traveled * sin(gyro_rad);
-    }
-    else
+    
+    
+    /*
     {
         // Arc motion - using differential drive kinematics with gyro heading
         x_position += (wheel_base_distance * (delta_left_distance + delta_right_distance)) 
@@ -236,14 +169,14 @@ void robot::updateOdometry(const TKobukiData &robotdata)
                         / (2.0 * (delta_right_distance - delta_left_distance)) 
                         * (cos(gyro_rad) - cos(gyro_rad_prev));
     }
-
+    */
     // Update previous encoder values for next iteration
     enc_left_prev = enc_left;
     enc_right_prev = enc_right;
 }
 
 // Updates arc trajectory to navigate towards target
-void robot::updateArcTrajectory(int current_target_index)
+void robot::updateArcTrajectory()
 {
     // Get current target from arrays
     double x_tgt = x_target_position[current_target_index];
@@ -254,25 +187,14 @@ void robot::updateArcTrajectory(int current_target_index)
     double dy = y_tgt - y_position;
     double distance_to_target = sqrt(dx * dx + dy * dy);
     
-    // Determine target velocity percentage based on state
-    double target_velocity_pct = 1.0; // Full speed by default
-    
-    // Check if target reached - ramp down to stop
+    // Check if target reached - stop
     if (distance_to_target < target_tolerance)
     {
-        target_velocity_pct = 0.0;
-        double velocity_pct = sCurveRamp(scurve_current_pct, target_velocity_pct);
-        forwardspeed = 0;
-        rotationspeed = 0;
-        integral_error = 0; // Reset integral when target reached
-        return;
-    }
-    
-    // Slow down when approaching target (within 0.5m)
-    if (distance_to_target < 0.5)
-    {
-        target_velocity_pct = distance_to_target / 0.5; // Linear slowdown zone
-        if (target_velocity_pct < 0.2) target_velocity_pct = 0.2; // Minimum 20%
+        current_target_index++;
+        if(current_target_index >= 3)
+        {
+            current_target_index = 0;
+        }
     }
     
     // Calculate angle to target
@@ -285,23 +207,14 @@ void robot::updateArcTrajectory(int current_target_index)
     
     // Apply PI regulator to get rotation speed (convert error to degrees)
     double error_degrees = heading_error * 180.0 / M_PI;
-    double base_rotationspeed = piRegulator(error_degrees);
+    rotationspeed = piRegulator(error_degrees);
     
-    // Calculate base forward speed
+    // Calculate forward speed
     // Reduce speed when turning sharply
     double heading_factor = cos(heading_error); // 1 when aligned, 0 when perpendicular
     if (heading_factor < 0.1) heading_factor = 0.1; // Minimum factor to keep moving
     
-    double base_forwardspeed = min_forward_speed + (max_forward_speed - min_forward_speed) * heading_factor;
-    
-    // Apply S-curve ramping to velocity
-    // This maintains the ratio between forward and rotation for arc trajectory
-    double velocity_pct = sCurveRamp(scurve_current_pct, target_velocity_pct);
-    scurve_current_pct = velocity_pct; // Update current percentage
-    
-    // Apply percentage to both speeds (maintains arc trajectory ratio)
-    forwardspeed = base_forwardspeed * velocity_pct;
-    rotationspeed = base_rotationspeed * velocity_pct;
+    forwardspeed = min_forward_speed + (max_forward_speed - min_forward_speed) * heading_factor;
     
     setSpeed(forwardspeed, rotationspeed);
     // Calculate arc radius for trajectory (positive = turn left, negative = turn right)
@@ -315,7 +228,8 @@ void robot::updateArcTrajectory(int current_target_index)
     {
         arc_radius = 0; // Straight line (infinite radius)
     }
-    
+    cout<<"Position: ("<<x_position<<", "<<y_position<<"), Target: ("<<x_tgt<<", "<<y_tgt<<"), Distance to Target: "<<distance_to_target<<" m, Heading Error: "<<error_degrees<<" deg, Forward Speed: "<<forwardspeed<<" mm/s, Rotation Speed: "<<rotationspeed<<" deg/s\n";
+          
 }
 
 
@@ -375,7 +289,7 @@ int robot::processThisRobot(const TKobukiData &robotdata)
     updateOdometry(robotdata);
 
     // PI regulation for arc trajectory towards target
-    updateArcTrajectory(1);
+    updateArcTrajectory();
     //synctimestamp = robotdata.Timestamp; na zadanie 3 
 ///TU PISTE KOD... TOTO JE TO MIESTO KED NEVIETE KDE ZACAT,TAK JE TO NAOZAJ TU. AK AJ TAK NEVIETE, SPYTAJTE SA CVICIACEHO MA TU NATO STRING KTORY DA DO HLADANIA XXX
 

@@ -88,28 +88,19 @@ private:
   double y_position = 0;
   double x_target = 0;
   double y_target = 0;
-  float x_target_position[1] = {0};
-  float y_target_position[1] = {0.5};
+  float x_target_position[3] = {0.3, 0.6, 0.9};
+  float y_target_position[3] = {0.0, 0.2, 0.0};
   int curve_steps = 1;
 
-  // S-curve velocity ramping parameters
-  double scurve_progress = 0.0;     // Current progress through S-curve (0 to 1)
-  double scurve_current_pct = 0.0;  // Current velocity as percentage (0 to 1)
-  double scurve_target_pct = 0.0;   // Target velocity as percentage (0 to 1)
-  double scurve_start_pct = 0.0;    // Starting velocity percentage when ramp began
-  int scurve_total_steps = 20;      // Total steps to complete S-curve ramp
-  int scurve_current_step = 0;      // Current step in the ramp
-  bool scurve_active = false;       // Is S-curve ramping active
-
   // PI regulator parameters
-  double Kp = 1.5;           // Proportional gain
+  double Kp = 0.5;           // Proportional gain
   double Ki = 0.05;          // Integral gain
   double integral_error = 0; // Accumulated integral error
-  double max_integral = 100; // Anti-windup limit
+  double max_integral = 10; // Anti-windup limit
   double max_rotation_speed = 180; // max rotation speed deg/s
   double min_forward_speed = 50;   // minimum forward speed mm/s
   double max_forward_speed = 200;  // maximum forward speed mm/s
-  double target_tolerance = 0.05;  // target reach tolerance in meters
+  double target_tolerance = 0.1;  // target reach tolerance in meters
   
   // Arc trajectory variables
   double arc_radius = 0;     // Current arc radius
@@ -125,11 +116,6 @@ private:
   
   // Odometry function - calculates position and distance traveled since last call
   void updateOdometry(const TKobukiData &robotdata);
-  
-  // S-curve velocity ramping function
-  double sCurveRamp(double current_pct, double target_pct);
-  void startSCurveRamp(double target_pct, int steps = 20);
-  double smootherstep(double t);
 
   enum CURVE_STATE
   {
