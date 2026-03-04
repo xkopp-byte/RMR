@@ -135,11 +135,6 @@ double robot::sCurveRamp(double current_pct, double target_pct)
 }
 
 
-
-
-
-
-
 // Calculates angle from current position to target position
 double robot::calculateAngleToTarget(double x_curr, double y_curr, double x_tgt, double y_tgt)
 {
@@ -248,7 +243,7 @@ void robot::updateOdometry(const TKobukiData &robotdata)
 }
 
 // Updates arc trajectory to navigate towards target
-void robot::updateArcTrajectory()
+void robot::updateArcTrajectory(int current_target_index)
 {
     // Get current target from arrays
     double x_tgt = x_target_position[current_target_index];
@@ -308,6 +303,7 @@ void robot::updateArcTrajectory()
     forwardspeed = base_forwardspeed * velocity_pct;
     rotationspeed = base_rotationspeed * velocity_pct;
     
+    setSpeed(forwardspeed, rotationspeed);
     // Calculate arc radius for trajectory (positive = turn left, negative = turn right)
     if (fabs(rotationspeed) > 0.01)
     {
@@ -319,13 +315,8 @@ void robot::updateArcTrajectory()
     {
         arc_radius = 0; // Straight line (infinite radius)
     }
+    
 }
-
-
-
-
-
-
 
 
 void robot::setSpeed(double forw, double rots)
@@ -342,11 +333,7 @@ void robot::setSpeed(double forw, double rots)
 }
 
 
-float x_current_position = 0;
-float y_current_position = 0;
 
-float x_target_position[] = {4};
-float y_target_position[] = {4};
 ///toto je calback na data z robota, ktory ste podhodili robotu vo funkcii initAndStartRobot
 /// vola sa vzdy ked dojdu nove data z robota. nemusite nic riesit, proste sa to stane
 int robot::processThisRobot(const TKobukiData &robotdata)
@@ -389,7 +376,7 @@ int robot::processThisRobot(const TKobukiData &robotdata)
 
     // PI regulation for arc trajectory towards target
     updateArcTrajectory(1);
-
+    //synctimestamp = robotdata.Timestamp; na zadanie 3 
 ///TU PISTE KOD... TOTO JE TO MIESTO KED NEVIETE KDE ZACAT,TAK JE TO NAOZAJ TU. AK AJ TAK NEVIETE, SPYTAJTE SA CVICIACEHO MA TU NATO STRING KTORY DA DO HLADANIA XXX
 
     ///kazdy piaty krat, aby to ui moc nepreblikavalo..

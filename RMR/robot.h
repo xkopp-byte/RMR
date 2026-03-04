@@ -32,6 +32,8 @@ public:
   void setSpeedVal(double forw, double rots);
   // tato funkcia fyzicky posiela hodnoty do robota
   void setSpeed(double forw, double rots);
+  void updateArcTrajectory(int current_target_index);
+
 signals:
   void publishPosition(double x, double y, double z);
   void publishLidar(const std::vector<LaserData> &lidata);
@@ -86,6 +88,8 @@ private:
   double y_position = 0;
   double x_target = 0;
   double y_target = 0;
+  float x_target_position[1] = {0};
+  float y_target_position[1] = {0.5};
   int curve_steps = 1;
 
   // S-curve velocity ramping parameters
