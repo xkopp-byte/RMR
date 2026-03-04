@@ -195,6 +195,11 @@ void robot::updateArcTrajectory()
         {
             current_target_index = 0;
         }
+        x_tgt = x_target_position[current_target_index];
+        y_tgt = y_target_position[current_target_index];
+        dx = x_tgt - x_position;
+        dy = y_tgt - y_position;
+        distance_to_target = sqrt(dx * dx + dy * dy);
     }
     
     // Calculate angle to target
@@ -210,11 +215,21 @@ void robot::updateArcTrajectory()
     rotationspeed = piRegulator(error_degrees);
     
     // Calculate forward speed
-    // Reduce speed when turning sharply
-    double heading_factor = cos(heading_error); // 1 when aligned, 0 when perpendicular
-    if (heading_factor < 0.1) heading_factor = 0.1; // Minimum factor to keep moving
-    
-    forwardspeed = min_forward_speed + (max_forward_speed - min_forward_speed) * heading_factor;
+    // If target is behind robot (heading error > 90°), turn in place first
+    if (fabs(heading_error) > M_PI / 2.0)
+    {
+        // Target is behind - turn in place
+        forwardspeed = 0;
+    }
+    else
+    {
+        // Target is in front - move and turn
+        // Reduce speed when turning sharply
+        double heading_factor = cos(heading_error); // 1 when aligned, 0 when perpendicular
+        if (heading_factor < 0.1) heading_factor = 0.1; // Minimum factor to keep moving
+        
+        forwardspeed = min_forward_speed + (max_forward_speed - min_forward_speed) * heading_factor;
+    }
     
     setSpeed(forwardspeed, rotationspeed);
     // Calculate arc radius for trajectory (positive = turn left, negative = turn right)
