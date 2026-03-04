@@ -176,7 +176,7 @@ void robot::updateOdometry(const TKobukiData &robotdata)
 
     cout << "Odometry Update - X: " << x_position << " m, Y: " << y_position << " m, Distance Traveled: " << distance_traveled << " m\n";
 }
-
+/*
 double robot::curve_modulation(double low, double high) // TODO, ale nepredbiehajme ...
 {
     double actual_speed = low;
@@ -197,7 +197,7 @@ double robot::curve_modulation(double low, double high) // TODO, ale nepredbieha
 
     return actual_speed;
 }
-
+*/
 // Smootherstep function (Ken Perlin's improved smoothstep)
 // Returns S-curve value for t in [0, 1]
 // Pattern: slow start -> fast middle -> slow end
@@ -264,6 +264,62 @@ double robot::sCurveRamp(double current_pct, double target_pct)
     return new_pct;
 }
 
+// Apply S-curve ramping to a speed value
+// For changes > 15% of max, use S-curve; otherwise apply directly
+double robot::applySpeedRamp(double current, double target, double max_speed,
+                              double& ramp_start, double& ramp_target,
+                              int& ramp_step, int& ramp_total_steps, bool& ramp_active)
+{
+    double change = fabs(target - current);
+    double threshold = speed_change_threshold * max_speed;
+    
+    // Small change - apply directly
+    if (change <= threshold && !ramp_active)
+    {
+        return target;
+    }
+    
+    // Large change or ramp in progress - use S-curve
+    // Start new ramp if target changed significantly
+    if (fabs(ramp_target - target) > 0.001 && !ramp_active)
+    {
+        ramp_start = current;
+        ramp_target = target;
+        ramp_step = 0;
+        ramp_total_steps = 20;
+        ramp_active = true;
+    }
+    
+    // If not ramping, return target
+    if (!ramp_active)
+    {
+        return target;
+    }
+    
+    // Increment step
+    ramp_step++;
+    
+    // Calculate progress through S-curve (0 to 1)
+    double progress = static_cast<double>(ramp_step) / static_cast<double>(ramp_total_steps);
+    if (progress > 1.0) progress = 1.0;
+    
+    // Apply smootherstep to get S-curve interpolation factor
+    double s_factor = smootherstep(progress);
+    
+    // Interpolate: start + (target - start) * s_factor
+    double new_speed = ramp_start + (ramp_target - ramp_start) * s_factor;
+    
+    // Check if ramp is complete
+    if (ramp_step >= ramp_total_steps)
+    {
+        ramp_active = false;
+        ramp_step = 0;
+        new_speed = ramp_target;
+    }
+    
+    return new_speed;
+}
+
 
 // Updates arc trajectory to navigate towards target
 void robot::updateArcTrajectory()
@@ -304,12 +360,15 @@ void robot::updateArcTrajectory()
     double error_degrees = heading_error * 180.0 / M_PI;
     rotationspeed = piRegulator(error_degrees);
     
-    // Calculate forward speed
+    // Calculate desired forward speed
+    double desired_forwardspeed = 0;
+    double desired_rotationspeed = rotationspeed;
+    
     // If target is behind robot (heading error > 90°), turn in place first
     if (fabs(heading_error) > M_PI / 2.0)
     {
         // Target is behind - turn in place
-        forwardspeed = 0;
+        desired_forwardspeed = 0;
     }
     else
     {
@@ -318,8 +377,20 @@ void robot::updateArcTrajectory()
         double heading_factor = cos(heading_error); // 1 when aligned, 0 when perpendicular
         if (heading_factor < 0.1) heading_factor = 0.1; // Minimum factor to keep moving
         
-        forwardspeed = min_forward_speed + (max_forward_speed - min_forward_speed) * heading_factor;
+        desired_forwardspeed = min_forward_speed + (max_forward_speed - min_forward_speed) * heading_factor;
     }
+    
+    // Apply S-curve ramping for large changes (>15% of max), direct for small changes
+    actual_forwardspeed = applySpeedRamp(actual_forwardspeed, desired_forwardspeed, max_forward_speed,
+                                          fwd_scurve_start, fwd_scurve_target,
+                                          fwd_scurve_step, fwd_scurve_total_steps, fwd_scurve_active);
+    
+    actual_rotationspeed = applySpeedRamp(actual_rotationspeed, desired_rotationspeed, max_rotation_speed,
+                                           rot_scurve_start, rot_scurve_target,
+                                           rot_scurve_step, rot_scurve_total_steps, rot_scurve_active);
+    
+    forwardspeed = actual_forwardspeed;
+    rotationspeed = actual_rotationspeed;
     
     setSpeed(forwardspeed, rotationspeed);
     // Calculate arc radius for trajectory (positive = turn left, negative = turn right)

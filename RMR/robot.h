@@ -88,18 +88,46 @@ private:
   double y_position = 0;
   double x_target = 0;
   double y_target = 0;
-  float x_target_position[4] = {-0.3, 0.6, 0.9, -0.1};
+  float x_target_position[4] = {0.3, 0.6, 0.9, -0.1};
   float y_target_position[4] = {0.0, 0.2, 0.0, 0.7};
   int curve_steps = 1;
+
+  // S-curve velocity ramping parameters
+  double scurve_progress = 0.0;     // Current progress through S-curve (0 to 1)
+  double scurve_current_pct = 0.0;  // Current velocity as percentage (0 to 1)
+  double scurve_target_pct = 0.0;   // Target velocity as percentage (0 to 1)
+  double scurve_start_pct = 0.0;    // Starting velocity percentage when ramp began
+  int scurve_total_steps = 20;      // Total steps to complete S-curve ramp
+  int scurve_current_step = 0;      // Current step in the ramp
+  bool scurve_active = false;       // Is S-curve ramping active
+  
+  // Actual speeds being sent to robot (smoothed by S-curve)
+  double actual_forwardspeed = 0.0;
+  double actual_rotationspeed = 0.0;
+  double speed_change_threshold = 0.15; // 15% threshold for using S-curve
+  
+  // S-curve ramping for forward speed
+  double fwd_scurve_start = 0.0;
+  double fwd_scurve_target = 0.0;
+  int fwd_scurve_step = 0;
+  int fwd_scurve_total_steps = 20;
+  bool fwd_scurve_active = false;
+  
+  // S-curve ramping for rotation speed
+  double rot_scurve_start = 0.0;
+  double rot_scurve_target = 0.0;
+  int rot_scurve_step = 0;
+  int rot_scurve_total_steps = 20;
+  bool rot_scurve_active = false;
 
   // PI regulator parameters
   double Kp = 0.01;           // Proportional gain
   double Ki = 0.001;          // Integral gain
   double integral_error = 0; // Accumulated integral error
   double max_integral = 10; // Anti-windup limit
-  double max_rotation_speed = 70; // max rotation speed deg/s
+  double max_rotation_speed = 30; // max rotation speed deg/s
   double min_forward_speed = 25;   // minimum forward speed mm/s
-  double max_forward_speed = 200;  // maximum forward speed mm/s
+  double max_forward_speed = 100;  // maximum forward speed mm/s
   double target_tolerance = 0.04;  // target reach tolerance in meters
   
   // Arc trajectory variables
@@ -116,6 +144,14 @@ private:
   
   // Odometry function - calculates position and distance traveled since last call
   void updateOdometry(const TKobukiData &robotdata);
+  
+  // S-curve velocity ramping functions
+  double sCurveRamp(double current_pct, double target_pct);
+  void startSCurveRamp(double target_pct, int steps = 20);
+  double smootherstep(double t);
+  double applySpeedRamp(double current, double target, double max_speed, 
+                        double& ramp_start, double& ramp_target, 
+                        int& ramp_step, int& ramp_total_steps, bool& ramp_active);
 
   enum CURVE_STATE
   {
