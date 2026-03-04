@@ -173,7 +173,97 @@ void robot::updateOdometry(const TKobukiData &robotdata)
     // Update previous encoder values for next iteration
     enc_left_prev = enc_left;
     enc_right_prev = enc_right;
+
+    cout << "Odometry Update - X: " << x_position << " m, Y: " << y_position << " m, Distance Traveled: " << distance_traveled << " m\n";
 }
+
+double robot::curve_modulation(double low, double high) // TODO, ale nepredbiehajme ...
+{
+    double actual_speed = low;
+    if (curve_state == CURVE_FINAL)
+    {
+        return high;
+    }
+    else if (curve_state == CURVE_CHANGING)
+    {
+        actual_speed = low + (high - low) * (1.0001 - 1 /static_cast<double>(curve_steps));
+        curve_steps++;
+        if (curve_steps > 10)
+        {
+            curve_state = CURVE_FINAL;
+            curve_steps = 0;
+        }
+    }
+
+    return actual_speed;
+}
+
+// Smootherstep function (Ken Perlin's improved smoothstep)
+// Returns S-curve value for t in [0, 1]
+// Pattern: slow start -> fast middle -> slow end
+double robot::smootherstep(double t)
+{
+    if (t <= 0.0) return 0.0;
+    if (t >= 1.0) return 1.0;
+    // 6t^5 - 15t^4 + 10t^3
+    return t * t * t * (t * (t * 6.0 - 15.0) + 10.0);
+}
+
+// Start a new S-curve ramp to target percentage
+// target_pct: target velocity as percentage (0 to 1)
+// steps: number of steps to complete the ramp (default 20)
+void robot::startSCurveRamp(double target_pct, int steps)
+{
+    scurve_target_pct = target_pct;
+    scurve_total_steps = steps;
+    scurve_current_step = 0;
+    scurve_active = true;
+    // scurve_current_pct remains at current value for smooth transition
+}
+
+// S-curve velocity ramping function
+// Returns percentage (0 to 1) that should be applied to velocities
+// Maintains ratio between forward and rotation speeds for arc trajectories
+double robot::sCurveRamp(double current_pct, double target_pct)
+{
+    // If target changed, start new ramp
+    if (fabs(scurve_target_pct - target_pct) > 0.001)
+    {
+        startSCurveRamp(target_pct);
+        scurve_start_pct = current_pct; // Store starting percentage
+    }
+    
+    // If not ramping or already at target, return target
+    if (!scurve_active || fabs(current_pct - target_pct) < 0.001)
+    {
+        scurve_active = false;
+        return target_pct;
+    }
+    
+    // Increment step
+    scurve_current_step++;
+    
+    // Calculate progress through S-curve (0 to 1)
+    scurve_progress = static_cast<double>(scurve_current_step) / static_cast<double>(scurve_total_steps);
+    if (scurve_progress > 1.0) scurve_progress = 1.0;
+    
+    // Apply smootherstep to get S-curve interpolation factor
+    double s_factor = smootherstep(scurve_progress);
+    
+    // Interpolate: start + (target - start) * s_factor
+    double new_pct = scurve_start_pct + (target_pct - scurve_start_pct) * s_factor;
+    
+    // Check if ramp is complete
+    if (scurve_current_step >= scurve_total_steps)
+    {
+        scurve_active = false;
+        scurve_current_step = 0;
+        new_pct = target_pct;
+    }
+    
+    return new_pct;
+}
+
 
 // Updates arc trajectory to navigate towards target
 void robot::updateArcTrajectory()
@@ -191,7 +281,7 @@ void robot::updateArcTrajectory()
     if (distance_to_target < target_tolerance)
     {
         current_target_index++;
-        if(current_target_index >= 3)
+        if(current_target_index >= sizeof(x_target_position)/sizeof(x_target_position[0]))
         {
             current_target_index = 0;
         }

@@ -88,19 +88,19 @@ private:
   double y_position = 0;
   double x_target = 0;
   double y_target = 0;
-  float x_target_position[3] = {0.3, 0.6, 0.9};
-  float y_target_position[3] = {0.0, 0.2, 0.0};
+  float x_target_position[4] = {-0.3, 0.6, 0.9, -0.1};
+  float y_target_position[4] = {0.0, 0.2, 0.0, 0.7};
   int curve_steps = 1;
 
   // PI regulator parameters
-  double Kp = 0.5;           // Proportional gain
-  double Ki = 0.05;          // Integral gain
+  double Kp = 0.01;           // Proportional gain
+  double Ki = 0.001;          // Integral gain
   double integral_error = 0; // Accumulated integral error
   double max_integral = 10; // Anti-windup limit
-  double max_rotation_speed = 180; // max rotation speed deg/s
-  double min_forward_speed = 50;   // minimum forward speed mm/s
+  double max_rotation_speed = 70; // max rotation speed deg/s
+  double min_forward_speed = 25;   // minimum forward speed mm/s
   double max_forward_speed = 200;  // maximum forward speed mm/s
-  double target_tolerance = 0.1;  // target reach tolerance in meters
+  double target_tolerance = 0.04;  // target reach tolerance in meters
   
   // Arc trajectory variables
   double arc_radius = 0;     // Current arc radius
