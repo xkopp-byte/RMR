@@ -39,7 +39,7 @@ void robot::setSpeedVal(double forw, double rots)
     useDirectCommands=0;
 }
 
-double robot::curve_modulation(double low, double high) // TODO, ale nepredbiehajme ...
+double robot::curve_modulation(double low, double high) 
 {
     double actual_speed = low;
     if (curve_state == CURVE_FINAL)
@@ -176,28 +176,7 @@ void robot::updateOdometry(const TKobukiData &robotdata)
 
     cout << "Odometry Update - X: " << x_position << " m, Y: " << y_position << " m, Distance Traveled: " << distance_traveled << " m\n";
 }
-/*
-double robot::curve_modulation(double low, double high) // TODO, ale nepredbiehajme ...
-{
-    double actual_speed = low;
-    if (curve_state == CURVE_FINAL)
-    {
-        return high;
-    }
-    else if (curve_state == CURVE_CHANGING)
-    {
-        actual_speed = low + (high - low) * (1.0001 - 1 /static_cast<double>(curve_steps));
-        curve_steps++;
-        if (curve_steps > 10)
-        {
-            curve_state = CURVE_FINAL;
-            curve_steps = 0;
-        }
-    }
 
-    return actual_speed;
-}
-*/
 // Smootherstep function (Ken Perlin's improved smoothstep)
 // Returns S-curve value for t in [0, 1]
 // Pattern: slow start -> fast middle -> slow end
@@ -334,18 +313,29 @@ void robot::updateArcTrajectory()
     double distance_to_target = sqrt(dx * dx + dy * dy);
     
     // Check if target reached - stop
-    if (distance_to_target < target_tolerance)
+    if ((distance_to_target < target_tolerance) && last_target_reached == false)
     {
         current_target_index++;
-        if(current_target_index >= sizeof(x_target_position)/sizeof(x_target_position[0]))
-        {
-            current_target_index = 0;
-        }
+        cout << "-----------------\nTarget " << current_target_index << " reached. \n-----------------\n\n";
+        // if(current_target_index >= sizeof(x_target_position)/sizeof(x_target_position[0]))
+        // {
+        //     current_target_index = 0;
+        // }
         x_tgt = x_target_position[current_target_index];
         y_tgt = y_target_position[current_target_index];
         dx = x_tgt - x_position;
         dy = y_tgt - y_position;
         distance_to_target = sqrt(dx * dx + dy * dy);
+        
+        if(current_target_index >= sizeof(x_target_position)/sizeof(x_target_position[0]))
+        {
+            last_target_reached = true;
+            current_target_index = 0;
+            forwardspeed = 0;
+            rotationspeed = 0;
+            setSpeed(forwardspeed, rotationspeed);
+            return;
+        }
     }
     
     // Calculate angle to target
@@ -428,44 +418,22 @@ void robot::setSpeed(double forw, double rots)
 /// vola sa vzdy ked dojdu nove data z robota. nemusite nic riesit, proste sa to stane
 int robot::processThisRobot(const TKobukiData &robotdata)
 {
-// JAKUB: toto som zatial zakomentoval, nech to nestratime, tym ze idem "prepisovat" main branch
-//     //rad by som spravil zmeny rychlosti kazdych 0.25 sekundy ked uz zacne robit jednu zmenu. aby sa ta s krivka aj prejavila 
-//     //robot sa realne zacne hybat okolo desiny rychlosti
-//     //od rychlosti 30 sa zacne robot spravat stabilnejsie, skok z pokoja na 30 moze byr rychlejsi a robot nebude presmykovat
-// 
-//     left_wheel[increment]=robotdata.EncoderLeft* robot.gettickToMeter;
-//     right_wheel[increment]=robotdata.EncoderRight* robot.gettickToMeter;
-//     gyro_actual[increment] = robotdata.GyroAngle;
-//     float gyro_rads = robotdata.GyroAngle
-//     float gyro_rads_prev = gyro_actual[(increment + 9) % 10];
-// 
-//     
-//     x_robot_last_position = x_robot_last_position  + ((wheel_base_distance * (left_wheel[increment] + right_wheel[increment]))
-//                                                    / (                   2 * (left_wheel[increment] + right_wheel[increment])))
-//                                                    * (sin(gyro_rads) - sin(gyro_rads_prev));
-//     y_robot_last_position = y_robot_last_position  - ((wheel_base_distance * (left_wheel[increment] + right_wheel[increment]))
-//                                                    / (                   2 * (left_wheel[increment] + right_wheel[increment])))
-//                                                    * (cos(gyro_rads) - cos(gyro_rads_prev));
-//     phi = gyro_rads;
-//     
-//     if (increment==9)
-//         increment=0;
-//         distance_whole_meter+=(sum(left_wheel, 10) + sum(right_wheel, 10)) / 2;
-//         x_robot_last_position += (left_wheel_speed + right_wheel_speed) / 2 * cos(phi) * 0.025;
-//         y_robot_last_position += (left_wheel_speed + right_wheel_speed) / 2 * sin(phi) * 0.025;
-//     else
-//         increment++;
-// 
-//     float x_actual_positin = x_robot_last_position + (left_wheel_speed + right_wheel_speed) / 2 * cos(phi) * 0.025; 
-//     float y_actual_position = y_robot_last_position + (left_wheel_speed + right_wheel_speed) / 2 * sin(phi) * 0.025;
-
     ///tu mozete robit s datami z robota
     
     // Update odometry - calculates position and distance traveled since last call
     updateOdometry(robotdata);
 
     // PI regulation for arc trajectory towards target
-    updateArcTrajectory();
+    if(last_target_reached == false)
+    {
+        updateArcTrajectory();
+    }
+    else
+    {
+        forwardspeed = 0;
+        rotationspeed = 0;
+        setSpeed(forwardspeed, rotationspeed);
+    }
     //synctimestamp = robotdata.Timestamp; na zadanie 3 
 ///TU PISTE KOD... TOTO JE TO MIESTO KED NEVIETE KDE ZACAT,TAK JE TO NAOZAJ TU. AK AJ TAK NEVIETE, SPYTAJTE SA CVICIACEHO MA TU NATO STRING KTORY DA DO HLADANIA XXX
 
@@ -500,6 +468,9 @@ int robot::processThisRobot(const TKobukiData &robotdata)
             robotCom.setTranslationSpeed(0);
     }
     datacounter++;
+
+
+    
 
     return 0;
 

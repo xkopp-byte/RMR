@@ -55,20 +55,8 @@ private:
   double forwardspeed;  // mm/s
   double rotationspeed; // omega/s
 
-//   // JAKUB: toto som zatial zakomentoval, nech to nestratime, tym ze idem "prepisovat" main branch
+
 // // nase privat premenne ˇˇˇˇˇˇˇˇˇˇˇˇˇˇ
-//   float distance_whole_meter = 0;
-//   float left_wheel[10] = {0};
-//   float right_wheel[10] = {0};  
-//   float phi = 0;
-//   uint8_t increment = 0;
-//   float x_robot_last_position = 0;
-//   float y_robot_last_position = 0;    
-//   float wheel_base_distance = 0.23; // vzdialenost medzi kolesami v metroch
-//   float robot_radius = 0.11;
-//   float gyro_actual[10] = {0};
-//   float gyro_rads_prev = 0;
-// // nase privat premenne ^^^^^^^^^^^^^^^^^
   double enc_left = 0;  /// rozsah IRC 0~65535 (2 byte) - TREBA OSETRIT PRETECIENIE
   double enc_right = 0;
   double enc_left_prev = 0;  // Previous encoder values for delta calculation
@@ -88,9 +76,12 @@ private:
   double y_position = 0;
   double x_target = 0;
   double y_target = 0;
-  float x_target_position[4] = {0.3, 0.6, 0.9, -0.1};
-  float y_target_position[4] = {0.0, 0.2, 0.0, 0.7};
+  // float x_target_position[2] = {1.0, 1.5};
+  // float y_target_position[2] = {0.1, 0.6};
+  float x_target_position[3] = {1.0, 1.0, 0.0};
+  float y_target_position[3] = {0.1, 0.0, 0.1};
   int curve_steps = 1;
+  bool last_target_reached = false;
 
   // S-curve velocity ramping parameters
   double scurve_progress = 0.0;     // Current progress through S-curve (0 to 1)
