@@ -39,35 +39,6 @@ void robot::setSpeedVal(double forw, double rots)
     useDirectCommands=0;
 }
 
-double robot::curve_modulation(double low, double high) // TODO, ale nepredbiehajme ...
-{
-    double actual_speed = low;
-    if (curve_state == CURVE_FINAL)
-    {
-        return high;
-    }
-    else if (curve_state == CURVE_CHANGING)
-    {
-        actual_speed = low + (high - low) * (1.0001 - 1 /static_cast<double>(curve_steps));
-        curve_steps++;
-        if (curve_steps > 10)
-        {
-            curve_state = CURVE_FINAL;
-            curve_steps = 0;
-        }
-    }
-
-    return actual_speed;
-}
-
-double robot::regulator(double error)
-{
-    forwardspeed = 0; // ??
-    rotationspeed = 0; // ??
-    curve_state = CURVE_CHANGING; // este neviem kedy to zapnut
-    return 0; 
-}
-
 void robot::setSpeed(double forw, double rots)
 {
     if(forw==0 && rots!=0)
@@ -82,79 +53,252 @@ void robot::setSpeed(double forw, double rots)
 }
 
 
-
-///toto je calback na data z robota, ktory ste podhodili robotu vo funkcii initAndStartRobot
-/// vola sa vzdy ked dojdu nove data z robota. nemusite nic riesit, proste sa to stane
-int robot::processThisRobot(const TKobukiData &robotdata)
+double robot::calculateAngleToTarget(double x_curr, double y_curr, double x_target, double y_target)
 {
-// JAKUB: toto som zatial zakomentoval, nech to nestratime, tym ze idem "prepisovat" main branch
-//     //rad by som spravil zmeny rychlosti kazdych 0.25 sekundy ked uz zacne robit jednu zmenu. aby sa ta s krivka aj prejavila 
-//     //robot sa realne zacne hybat okolo desiny rychlosti
-//     //od rychlosti 30 sa zacne robot spravat stabilnejsie, skok z pokoja na 30 moze byr rychlejsi a robot nebude presmykovat
-// 
-//     left_wheel[increment]=robotdata.EncoderLeft* robot.gettickToMeter;
-//     right_wheel[increment]=robotdata.EncoderRight* robot.gettickToMeter;
-//     gyro_actual[increment] = robotdata.GyroAngle;
-//     float gyro_rads = robotdata.GyroAngle
-//     float gyro_rads_prev = gyro_actual[(increment + 9) % 10];
-// 
-//     
-//     x_robot_last_position = x_robot_last_position  + ((wheel_base_distance * (left_wheel[increment] + right_wheel[increment]))
-//                                                    / (                   2 * (left_wheel[increment] + right_wheel[increment])))
-//                                                    * (sin(gyro_rads) - sin(gyro_rads_prev));
-//     y_robot_last_position = y_robot_last_position  - ((wheel_base_distance * (left_wheel[increment] + right_wheel[increment]))
-//                                                    / (                   2 * (left_wheel[increment] + right_wheel[increment])))
-//                                                    * (cos(gyro_rads) - cos(gyro_rads_prev));
-//     phi = gyro_rads;
-//     
-//     if (increment==9)
-//         increment=0;
-//         distance_whole_meter+=(sum(left_wheel, 10) + sum(right_wheel, 10)) / 2;
-//         x_robot_last_position += (left_wheel_speed + right_wheel_speed) / 2 * cos(phi) * 0.025;
-//         y_robot_last_position += (left_wheel_speed + right_wheel_speed) / 2 * sin(phi) * 0.025;
-//     else
-//         increment++;
-// 
-//     float x_actual_positin = x_robot_last_position + (left_wheel_speed + right_wheel_speed) / 2 * cos(phi) * 0.025; 
-//     float y_actual_position = y_robot_last_position + (left_wheel_speed + right_wheel_speed) / 2 * sin(phi) * 0.025;
+    double x_distance_to = x_target - x_curr;
+    double y_distance_to = y_target - y_curr;
+    return atan2(y_distance_to, x_distance_to); 
+    //return uhol k cielu
+}
 
-    ///tu mozete robit s datami z robota
+// Normalizes angle to range [-PI, PI]
+double robot::normalizeAngle(double angle)
+{
+    while (angle > M_PI) angle -= 2.0 * M_PI;
+    while (angle < -M_PI) angle += 2.0 * M_PI;
+    return angle;
+}
+
+// PI regulator for heading control
+double robot::piRegulator(double error)
+{
+    double p_term = Kp * error;
     
-    // pri prvom spusteni callbacku treba ulozit pociatocne hodnoty gyra
+    integral_error += error * sample_period;
+    if (integral_error > max_integral) integral_error = max_integral;
+    if (integral_error < -max_integral) integral_error = -max_integral;
+    double i_term = Ki * integral_error;
+    
+    double output = p_term + i_term;
+    if (output > max_rotation_speed) output = max_rotation_speed;
+    if (output < -max_rotation_speed) output = -max_rotation_speed;
+    cout<<"PI Regulator - Error: "<<error<<" deg, P: "<<p_term<<" I: "<<i_term<<" Output: "<<output<<" deg/s\n";
+    return output;
+}
+
+// Odometry function - calculates position and distance traveled since last call
+void robot::updateOdometry(const TKobukiData &robotdata)
+{
     if(first_reading_flag == true)
     {
         gyro_correction = robotdata.GyroAngle;
-        gyro_angle_prev = robotdata.GyroAngle - gyro_correction;
+        gyro_angle_prev = 0;
+        enc_left_prev = robotdata.EncoderLeft;
+        enc_right_prev = robotdata.EncoderRight;
         first_reading_flag = false;
+        return;
     }
+
+    gyro_angle_prev = gyro_angle;
 
     enc_left = robotdata.EncoderLeft;
     enc_right = robotdata.EncoderRight;
     gyro_angle = robotdata.GyroAngle - gyro_correction;
 
-    enc_left_distance = enc_left * robotCom.getTickToMeter();
-    enc_right_distance = enc_right * robotCom.getTickToMeter();
+    double delta_enc_left = enc_left - enc_left_prev;
+    double delta_enc_right = enc_right - enc_right_prev;
+    
+    //overflow handlers
+    if (delta_enc_left > 32767) delta_enc_left -= 65536;
+    if (delta_enc_left < -32767) delta_enc_left += 65536;
+    if (delta_enc_right > 32767) delta_enc_right -= 65536;
+    if (delta_enc_right < -32767) delta_enc_right += 65536;
 
-    // Vypocet novej pozicie X a Y
-    if(enc_left_distance == enc_right_distance) 
+    delta_left_distance = delta_enc_left * robotCom.getTickToMeter();
+    delta_right_distance = delta_enc_right * robotCom.getTickToMeter();
+    distance_traveled = (delta_left_distance + delta_right_distance) / 2.0;
+    //gyro do radianov
+    double gyro_rad = gyro_angle * M_PI / 18000.0;
+    double gyro_rad_prev = gyro_angle_prev * M_PI / 18000.0;
+
+    x_position += distance_traveled * cos(gyro_rad);
+    y_position += distance_traveled * sin(gyro_rad);
+    /*
     {
-        x_position += enc_left_distance * cos(gyro_angle);
-        y_position += enc_left_distance * sin(gyro_angle);
+        // maybe we need to use this
+        x_position += (wheel_base_distance * (delta_left_distance + delta_right_distance)) 
+                        / (2.0 * (delta_right_distance - delta_left_distance)) 
+                        * (sin(gyro_rad) - sin(gyro_rad_prev));
+        y_position -= (wheel_base_distance * (delta_left_distance + delta_right_distance))
+                        / (2.0 * (delta_right_distance - delta_left_distance)) 
+                        * (cos(gyro_rad) - cos(gyro_rad_prev));
+    }
+    */
+    // Update previous encoder values for next iteration
+    enc_left_prev = enc_left;
+    enc_right_prev = enc_right;
+
+    cout << "Odometry Update - X: " << x_position << " m, Y: " << y_position << " m, Distance Traveled: " << distance_traveled << " m\n";
+}
+
+
+double robot::applySpeedRamp(double current, double target, double max_speed,
+                              double& ramp_start, double& ramp_target,
+                              int& ramp_step, int& ramp_total_steps, bool& ramp_active)
+{
+    if (fabs(ramp_target - target) > 0.05 && !ramp_active) //0.05 je threshold zmeny pri ktorej sa to vykona inicializacia a vypocet krokov
+    {
+        ramp_start = current;
+        ramp_target = target;
+        ramp_step = 0;
+        // this is smart. vypocitava to pocet krokov na zmenu rychlosti prpoporcne k velkosti zmeny a max rychlosti. takze pri velkych zmenach bude ramp trvat dlhsie, pri malych zmenach bude ramp rychlejsia
+        ramp_total_steps = static_cast<int>(50.0 * fabs(target - current) / max_speed);
+        if (ramp_total_steps < 1) ramp_total_steps = 1; // handler na 1 step pri malych zmenach
+
+        ramp_active = true;
+    }
+    if (!ramp_active)
+    {
+        return target;
+    }
+    ramp_step++;
+    
+    double t = static_cast<double>(ramp_step) / static_cast<double>(ramp_total_steps);
+    if (t > 1.0) t = 1.0;
+    if (t <= 0.0) t = 0.0;
+    
+    // 6t^5 - 15t^4 + 10t^3
+    double s_factor = t * t * t * (t * (t * 6.0 - 15.0) + 10.0);
+    double new_speed = ramp_start + (ramp_target - ramp_start) * s_factor;
+    cout<<"Speed Ramp - Step: "<<ramp_step<<"/"<<ramp_total_steps<<", Target: "<<target<<" Current: "<<current<<" New Speed: "<<new_speed<<"\n"<<"S factor: "<<s_factor<<"\n";
+    if (ramp_step >= ramp_total_steps)
+    {
+        ramp_active = false;
+        ramp_step = 0;
+        new_speed = ramp_target;
+    }
+
+    return new_speed;
+}
+
+
+void robot::updateArcTrajectory()
+{
+    //tato vs chcena pozicia a checking ked sa tam dostane, ak sa tam dostane pojde na dalsiu poziciu, ak sa dostane na vsetky pozicie, tak zastavi a nic viac nebude robit
+    double x_target = x_target_position[current_target_index];
+    double y_target = y_target_position[current_target_index];
+    double x_distance_to = x_target - x_position; //x a y_position su definovane v robot.h ako startovacie parametre 0,0
+    double y_distance_to = y_target - y_position;
+
+    double distance_to_target = sqrt(x_distance_to * x_distance_to + y_distance_to * y_distance_to);
+    double angle_to_target = atan2(y_distance_to, x_distance_to); 
+
+    //check ci je robot v bode, ak je v bode, tak sa posunie na dalsi bod, ak je vsetky body dosiahnute, tak zastavi
+    if ((distance_to_target < target_tolerance) && last_target_reached == false)
+    {
+        cout << "-----------------\nTarget " << current_target_index << " reached. \n-----------------\n\n";
+        current_target_index++;
+        cout << "Moving to Target " << current_target_index << ": (" << x_target_position[current_target_index] << ", " << y_target_position[current_target_index] << ")\n";
+        x_target = x_target_position[current_target_index];
+        y_target = y_target_position[current_target_index];
+        x_distance_to = x_target - x_position;
+        y_distance_to = y_target - y_position;
+        distance_to_target = sqrt(x_distance_to * x_distance_to + y_distance_to * y_distance_to);
+        
+        if(current_target_index >= sizeof(x_target_position)/sizeof(x_target_position[0]))
+        {
+            last_target_reached = true;
+            current_target_index = 0;
+            forwardspeed = 0;
+            rotationspeed = 0;
+            setSpeed(forwardspeed, rotationspeed);
+            return;
+        }
+    }
+
+
+    
+    //konvert na stupne z gyro jednotiek a zmena do rozsahu -180°~180°, takto sa dobre otoci 
+    double current_heading_rad = gyro_angle * M_PI / 18000.0;
+    heading_error = normalizeAngle(angle_to_target - current_heading_rad);    
+    double error_degrees = heading_error * 180.0 / M_PI;
+    rotationspeed = piRegulator(error_degrees);
+    
+    double desired_forwardspeed = 0;
+    
+    // tu sa bude tocit na mieste. pridame sem podmienky aj ak vyhodnoti ze ide 
+    if (fabs(heading_error) > M_PI / 2.0)
+    {
+        //robot v tomto pripade velmi rychlo zastane co nechceme
+        desired_forwardspeed = 0; //potom zakomentujeme
     }
     else
     {
-        x_position += (wheel_base_distance*(enc_left_distance + enc_right_distance)) 
-                        / (2*(enc_right_distance - enc_left_distance)) 
-                        * (sin(gyro_angle) - sin(gyro_angle_prev));
-        y_position -= (wheel_base_distance*(enc_left_distance + enc_right_distance))
-                        / (2*(enc_right_distance - enc_left_distance)) 
-                        * (cos(gyro_angle) - cos(gyro_angle_prev));
+        //toto je slowing down pri uhloch
+        //toto je proporcionalna hodnota, ako moc je v predu
+        desired_forwardspeed = max_forward_speed * cos(heading_error);
+    }
+    
+
+    //tu by som jebol vyhodnotenia ako rychlo ma zatacat
+    actual_forwardspeed = applySpeedRamp(actual_forwardspeed, desired_forwardspeed, max_forward_speed,
+                                          fwd_scurve_start, fwd_scurve_target,
+                                          fwd_scurve_step, fwd_scurve_total_steps, fwd_scurve_active);
+    /* rotation speed uz je already z pi regulatora vypocitana
+    actual_rotationspeed = applySpeedRamp(actual_rotationspeed, desired_rotationspeed, max_rotation_speed,
+                                           rot_scurve_start, rot_scurve_target,
+                                           rot_scurve_step, rot_scurve_total_steps, rot_scurve_active);
+        */
+
+
+    
+    forwardspeed = actual_forwardspeed;
+    //rotationspeed = actual_rotationspeed;
+    
+    setSpeed(forwardspeed, rotationspeed);
+    // Calculate arc radius for trajectory (positive = turn left, negative = turn right)
+    if (fabs(rotationspeed) > 0.01)
+    {
+        // R = v / omega (convert rotationspeed from deg/s to rad/s)
+        double omega_rad = rotationspeed * M_PI / 180.0;
+        arc_radius = forwardspeed / omega_rad; // Arc radius in mm
+    }
+    else
+    {
+        arc_radius = 0; // Straight line (infinite radius)
     }
 
-    // akcny_zasah = regulator() ... DOKONCIT
+    
+    cout<<"Position: ("<<x_position<<", "<<y_position<<"), Target: ("<<x_target<<", "<<y_target<<"), Distance to Target: "<<distance_to_target<<" m, Heading Error: "<<error_degrees<<" deg, Forward Speed: "<<forwardspeed<<" mm/s, Rotation Speed: "<<rotationspeed<<" deg/s\n";
+          
+}
 
 
-///TU PISTE KOD... TOTO JE TO MIESTO KED NEVIETE KDE ZACAT,TAK JE TO NAOZAJ TU. AK AJ TAK NEVIETE, SPYTAJTE SA CVICIACEHO MA TU NATO STRING KTORY DA DO HLADANIA XXX
+
+
+
+///toto je calback na data z robota, ktory ste podhodili robotu vo funkcii initAndStartRobot
+/// vola sa vzdy ked dojdu nove data z robota. nemusite nic riesit, proste sa to stane
+int robot::processThisRobot(const TKobukiData &robotdata)
+{    
+    updateOdometry(robotdata);
+
+    if(last_target_reached == false)
+    {
+        updateArcTrajectory();
+    }
+    else
+    {
+        forwardspeed = 0;
+        rotationspeed = 0;
+        setSpeed(forwardspeed, rotationspeed);
+    }
+    cout<<"\n";
+
+
+
+
+    //synctimestamp = robotdata.Timestamp; na zadanie 3 
 
     ///kazdy piaty krat, aby to ui moc nepreblikavalo..
     if(datacounter%5==0)
@@ -187,6 +331,9 @@ int robot::processThisRobot(const TKobukiData &robotdata)
             robotCom.setTranslationSpeed(0);
     }
     datacounter++;
+
+
+    
 
     return 0;
 
