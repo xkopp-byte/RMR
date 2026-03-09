@@ -76,10 +76,10 @@ private:
   double y_position = 0;
   double x_target = 0;
   double y_target = 0;
-  // float x_target_position[2] = {1.0, 1.5};
-  // float y_target_position[2] = {0.1, 0.6};
-  float x_target_position[3] = {1.0, 1.0, 0.0};
-  float y_target_position[3] = {0.1, 0.0, 0.1};
+  // float x_target_position[2] = {0.0, 1.0};
+  // float y_target_position[2] = {3.0, 2.9};
+  float x_target_position[6] = {1.0, 1.0, 0.0, 0.0, 0.0, 3.0};
+  float y_target_position[6] = {0.1, 0.0, 0.1, 0.0, 3.5, 4.0};
   int curve_steps = 1;
   bool last_target_reached = false;
 

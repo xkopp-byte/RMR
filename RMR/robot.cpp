@@ -227,7 +227,7 @@ void robot::updateArcTrajectory()
     double desired_forwardspeed = 0;
     
     // tu sa bude tocit na mieste. pridame sem podmienky aj ak vyhodnoti ze ide 
-    if (fabs(heading_error) > M_PI / 2.0)
+    if (fabs(heading_error) >= M_PI / 2.0)
     {
         //robot v tomto pripade velmi rychlo zastane co nechceme
         desired_forwardspeed = 0; //potom zakomentujeme
@@ -237,6 +237,8 @@ void robot::updateArcTrajectory()
         //toto je slowing down pri uhloch
         //toto je proporcionalna hodnota, ako moc je v predu
         desired_forwardspeed = max_forward_speed * cos(heading_error);
+        if (desired_forwardspeed < min_forward_speed && distance_to_target > target_tolerance)
+            desired_forwardspeed = min_forward_speed;  // Enforce minimum speed
     }
     
 
