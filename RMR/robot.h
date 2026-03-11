@@ -76,12 +76,13 @@ private:
   double y_position = 0;
   double x_target = 0;
   double y_target = 0;
-  // float x_target_position[2] = {0.0, 1.0};
-  // float y_target_position[2] = {3.0, 2.9};
-  float x_target_position[6] = {1.0, 1.0, 0.0, 0.0, 0.0, 3.0};
-  float y_target_position[6] = {0.1, 0.0, 0.1, 0.0, 3.5, 4.0};
+  // float x_target_position[6] = {0.0, 0.4, 0.4, 0.0, 0.0, 1};
+  // float y_target_position[6] = {0.4, 0.4, 0.0, 0.0, 0.4, 0.0};
+  float x_target_position[2] = {1.5, 0.0};
+  float y_target_position[2] = {0.0, 0.0};
   int curve_steps = 1;
   bool last_target_reached = false;
+  bool is_in_vicinity_of_target = false;
 
   // S-curve velocity ramping parameters
   double scurve_progress = 0.0;     // Current progress through S-curve (0 to 1)
@@ -112,13 +113,13 @@ private:
   bool rot_scurve_active = false;
 
   // PI regulator parameters
-  double Kp = 0.01;           // Proportional gain
+  double Kp = 0.01*1;           // Proportional gain
   double Ki = 0.001;          // Integral gain
   double integral_error = 0; // Accumulated integral error
   double max_integral = 10; // Anti-windup limit
   double max_rotation_speed = 30; // max rotation speed deg/s
-  double min_forward_speed = 25;   // minimum forward speed mm/s
-  double max_forward_speed = 100;  // maximum forward speed mm/s
+  double min_forward_speed = 40;   // minimum forward speed mm/s
+  double max_forward_speed = 300;  // maximum forward speed mm/s
   double target_tolerance = 0.04;  // target reach tolerance in meters
   
   // Arc trajectory variables

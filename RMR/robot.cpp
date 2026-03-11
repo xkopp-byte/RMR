@@ -145,7 +145,8 @@ void robot::updateOdometry(const TKobukiData &robotdata)
 double robot::applySpeedRamp(double current, double target, double max_speed,
                               double& ramp_start, double& ramp_target,
                               int& ramp_step, int& ramp_total_steps, bool& ramp_active)
-{
+{  
+
     if (fabs(ramp_target - target) > 0.05 && !ramp_active) //0.05 je threshold zmeny pri ktorej sa to vykona inicializacia a vypocet krokov
     {
         ramp_start = current;
@@ -193,6 +194,7 @@ void robot::updateArcTrajectory()
     double distance_to_target = sqrt(x_distance_to * x_distance_to + y_distance_to * y_distance_to);
     double angle_to_target = atan2(y_distance_to, x_distance_to); 
 
+
     //check ci je robot v bode, ak je v bode, tak sa posunie na dalsi bod, ak je vsetky body dosiahnute, tak zastavi
     if ((distance_to_target < target_tolerance) && last_target_reached == false)
     {
@@ -204,6 +206,7 @@ void robot::updateArcTrajectory()
         x_distance_to = x_target - x_position;
         y_distance_to = y_target - y_position;
         distance_to_target = sqrt(x_distance_to * x_distance_to + y_distance_to * y_distance_to);
+        is_in_vicinity_of_target = false; // reset proximity flag for new target
         
         if(current_target_index >= sizeof(x_target_position)/sizeof(x_target_position[0]))
         {
@@ -216,7 +219,10 @@ void robot::updateArcTrajectory()
         }
     }
 
-
+    if ( 0.2 >= distance_to_target)
+    {
+        is_in_vicinity_of_target = true;
+    }
     
     //konvert na stupne z gyro jednotiek a zmena do rozsahu -180°~180°, takto sa dobre otoci 
     double current_heading_rad = gyro_angle * M_PI / 18000.0;
@@ -236,21 +242,31 @@ void robot::updateArcTrajectory()
     {
         //toto je slowing down pri uhloch
         //toto je proporcionalna hodnota, ako moc je v predu
+        if(cos(heading_error) >= 0.995)
+            integral_error = 0;
         desired_forwardspeed = max_forward_speed * cos(heading_error);
         if (desired_forwardspeed < min_forward_speed && distance_to_target > target_tolerance)
             desired_forwardspeed = min_forward_speed;  // Enforce minimum speed
     }
+    if (is_in_vicinity_of_target)
+    {
+        desired_forwardspeed = forwardspeed * distance_to_target;
+        if (desired_forwardspeed < min_forward_speed)
+            desired_forwardspeed = min_forward_speed;
+    }
     
-
     //tu by som jebol vyhodnotenia ako rychlo ma zatacat
     actual_forwardspeed = applySpeedRamp(actual_forwardspeed, desired_forwardspeed, max_forward_speed,
-                                          fwd_scurve_start, fwd_scurve_target,
-                                          fwd_scurve_step, fwd_scurve_total_steps, fwd_scurve_active);
-    /* rotation speed uz je already z pi regulatora vypocitana
-    actual_rotationspeed = applySpeedRamp(actual_rotationspeed, desired_rotationspeed, max_rotation_speed,
-                                           rot_scurve_start, rot_scurve_target,
-                                           rot_scurve_step, rot_scurve_total_steps, rot_scurve_active);
-        */
+                                        fwd_scurve_start, fwd_scurve_target,
+                                        fwd_scurve_step, fwd_scurve_total_steps, fwd_scurve_active);
+    // //rotation speed uz je already z pi regulatora vypocitana
+    // actual_rotationspeed = applySpeedRamp(actual_rotationspeed, desired_rotationspeed, max_rotation_speed,
+    //                                     rot_scurve_start, rot_scurve_target,
+    //                                     rot_scurve_step, rot_scurve_total_steps, rot_scurve_active);
+    
+    
+
+    
 
 
     
@@ -259,20 +275,9 @@ void robot::updateArcTrajectory()
     
     setSpeed(forwardspeed, rotationspeed);
     // Calculate arc radius for trajectory (positive = turn left, negative = turn right)
-    if (fabs(rotationspeed) > 0.01)
-    {
-        // R = v / omega (convert rotationspeed from deg/s to rad/s)
-        double omega_rad = rotationspeed * M_PI / 180.0;
-        arc_radius = forwardspeed / omega_rad; // Arc radius in mm
-    }
-    else
-    {
-        arc_radius = 0; // Straight line (infinite radius)
-    }
-
     
     cout<<"Position: ("<<x_position<<", "<<y_position<<"), Target: ("<<x_target<<", "<<y_target<<"), Distance to Target: "<<distance_to_target<<" m, Heading Error: "<<error_degrees<<" deg, Forward Speed: "<<forwardspeed<<" mm/s, Rotation Speed: "<<rotationspeed<<" deg/s\n";
-          
+    cout<<"\n ----- Distance to target: " <<distance_to_target<<" Actual speed: "<<actual_forwardspeed<<" mm/s, Desired forward speed: "<<desired_forwardspeed<<" mm/s, In Vicinity: "<<is_in_vicinity_of_target<<"\n\n";      
 }
 
 
