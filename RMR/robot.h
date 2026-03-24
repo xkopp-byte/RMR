@@ -32,6 +32,8 @@ public:
   void setSpeedVal(double forw, double rots);
   // tato funkcia fyzicky posiela hodnoty do robota
   void setSpeed(double forw, double rots);
+  void updateArcTrajectory(int current_target_index);
+
 signals:
   void publishPosition(double x, double y, double z);
   void publishLidar(const std::vector<LaserData> &lidata);
@@ -53,24 +55,17 @@ private:
   double forwardspeed;  // mm/s
   double rotationspeed; // omega/s
 
-//   // JAKUB: toto som zatial zakomentoval, nech to nestratime, tym ze idem "prepisovat" main branch
+
 // // nase privat premenne ˇˇˇˇˇˇˇˇˇˇˇˇˇˇ
-//   float distance_whole_meter = 0;
-//   float left_wheel[10] = {0};
-//   float right_wheel[10] = {0};  
-//   float phi = 0;
-//   uint8_t increment = 0;
-//   float x_robot_last_position = 0;
-//   float y_robot_last_position = 0;    
-//   float wheel_base_distance = 0.23; // vzdialenost medzi kolesami v metroch
-//   float robot_radius = 0.11;
-//   float gyro_actual[10] = {0};
-//   float gyro_rads_prev = 0;
-// // nase privat premenne ^^^^^^^^^^^^^^^^^
   double enc_left = 0;  /// rozsah IRC 0~65535 (2 byte) - TREBA OSETRIT PRETECIENIE
   double enc_right = 0;
+  double enc_left_prev = 0;  // Previous encoder values for delta calculation
+  double enc_right_prev = 0;
   double enc_left_distance = 0;
   double enc_right_distance = 0;
+  double delta_left_distance = 0;  // Distance traveled since last call
+  double delta_right_distance = 0;
+  double distance_traveled = 0;    // Total distance traveled since last call (average of both wheels)
   double gyro_angle = 0;  /// rozsah gyra -18000~18000 -> -180°~180° - TREBA OSETRIT PRETECIENIE
   double gyro_angle_prev = 0;
   bool first_reading_flag = true;
@@ -81,8 +76,76 @@ private:
   double y_position = 0;
   double x_target = 0;
   double y_target = 0;
+  // float x_target_position[6] = {0.0, 0.4, 0.4, 0.0, 0.0, 1};
+  // float y_target_position[6] = {0.4, 0.4, 0.0, 0.0, 0.4, 0.0};
+  float x_target_position[1] = {1};
+  float y_target_position[1] = {0.5};
   int curve_steps = 1;
- 
+  bool last_target_reached = false;
+  bool is_in_vicinity_of_target = false;
+
+  // S-curve velocity ramping parameters
+  double scurve_progress = 0.0;     // Current progress through S-curve (0 to 1)
+  double scurve_current_pct = 0.0;  // Current velocity as percentage (0 to 1)
+  double scurve_target_pct = 0.0;   // Target velocity as percentage (0 to 1)
+  double scurve_start_pct = 0.0;    // Starting velocity percentage when ramp began
+  int scurve_total_steps = 20;      // Total steps to complete S-curve ramp
+  int scurve_current_step = 0;      // Current step in the ramp
+  bool scurve_active = false;       // Is S-curve ramping active
+  
+  // Actual speeds being sent to robot (smoothed by S-curve)
+  double actual_forwardspeed = 0.0;
+  double actual_rotationspeed = 0.0;
+  double speed_change_threshold = 0.15; // 15% threshold for using S-curve
+  double moment_forwardspeed;
+  
+  // S-curve ramping for forward speed
+  double fwd_scurve_start = 0.0;
+  double fwd_scurve_target = 0.0;
+  int fwd_scurve_step = 0;
+  int fwd_scurve_total_steps = 20;
+  bool fwd_scurve_active = false;
+  
+  // S-curve ramping for rotation speed
+  double rot_scurve_start = 0.0;
+  double rot_scurve_target = 0.0;
+  int rot_scurve_step = 0;
+  int rot_scurve_total_steps = 20;
+  bool rot_scurve_active = false;
+  bool flag = false;
+
+  // PI regulator parameters
+  double Kp = 0.01*1.2;           // Proportional gain
+  double Ki = 0.0015;          // Integral gain
+  double integral_error = 0; // Accumulated integral error
+  double max_integral = 10; // Anti-windup limit
+  double max_rotation_speed = 30; // max rotation speed deg/s
+  double min_forward_speed = 40;   // minimum forward speed mm/s
+  double max_forward_speed = 300;  // maximum forward speed mm/s
+  double target_tolerance = 0.02;  // target reach tolerance in meters
+  
+  // Arc trajectory variables
+  double arc_radius = 0;     // Current arc radius
+  double angle_to_target = 0; // Angle from robot to target
+  double heading_error = 0;   // Error between current heading and target angle
+  int current_target_index = 0; // Index in target array
+
+  // Helper functions for PI regulation
+  double calculateAngleToTarget(double x_curr, double y_curr, double x_tgt, double y_tgt);
+  double normalizeAngle(double angle);
+  double piRegulator(double error);
+  void updateArcTrajectory();
+  
+  // Odometry function - calculates position and distance traveled since last call
+  void updateOdometry(const TKobukiData &robotdata);
+  
+  // S-curve velocity ramping functions
+  double sCurveRamp(double current_pct, double target_pct);
+  void startSCurveRamp(double target_pct, int steps = 20);
+  double smootherstep(double t);
+  double applySpeedRamp(double current, double target, double max_speed, 
+                        double& ramp_start, double& ramp_target, 
+                        int& ramp_step, int& ramp_total_steps, bool& ramp_active);
 
   enum CURVE_STATE
   {
