@@ -98,22 +98,36 @@ void robot::updateOdometry(const TKobukiData &robotdata)
         first_reading_flag = false;
         return;
     }
-
     gyro_angle_prev = gyro_angle;
-
     enc_left = robotdata.EncoderLeft;
     enc_right = robotdata.EncoderRight;
     gyro_angle = robotdata.GyroAngle - gyro_correction;
 
+    //GYROOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOO
+    // Keep lidar segment indexing aligned with robot heading (segment 0 = forward).
+    // 36000 gyro units = 360 degrees, so one of 80 segments is 450 gyro units.
+    double delta_gyro_units = gyro_angle - gyro_angle_prev;
+    if (delta_gyro_units > 18000.0) delta_gyro_units -= 36000.0;
+    if (delta_gyro_units < -18000.0) delta_gyro_units += 36000.0;
+    const double segment_gyro_units = 36000.0 / 80.0;
+    // Negate so right turn shifts segments to the right.
+    lidar_rotation_remainder += -delta_gyro_units;
+    const int segment_steps = static_cast<int>(lidar_rotation_remainder / segment_gyro_units);
+    rotateLidarSegmentsBySteps(segment_steps);
+    lidar_rotation_remainder -= static_cast<double>(segment_steps) * segment_gyro_units;
+    cout << "\ngyro_delta=" << delta_gyro_units
+            << " steps=" << segment_steps;
+        for (int i = 0; i < 80; i++)
+    {
+        cout << lidar_segments[i];
+    }
+    //GYROOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOO
     double delta_enc_left = enc_left - enc_left_prev;
     double delta_enc_right = enc_right - enc_right_prev;
-    
-    //overflow handlers
     if (delta_enc_left > 32767) delta_enc_left -= 65536;
     if (delta_enc_left < -32767) delta_enc_left += 65536;
     if (delta_enc_right > 32767) delta_enc_right -= 65536;
     if (delta_enc_right < -32767) delta_enc_right += 65536;
-
     delta_left_distance = delta_enc_left * robotCom.getTickToMeter();
     delta_right_distance = delta_enc_right * robotCom.getTickToMeter();
     distance_traveled = (delta_left_distance + delta_right_distance) / 2.0;
@@ -137,8 +151,7 @@ void robot::updateOdometry(const TKobukiData &robotdata)
     // Update previous encoder values for next iteration
     enc_left_prev = enc_left;
     enc_right_prev = enc_right;
-
-    cout << "Odometry Update - X: " << x_position << " m, Y: " << y_position << " m, Distance Traveled: " << distance_traveled << " m\n";
+    cout << "\nOdometry Update - X: " << x_position << " m, Y: " << y_position << " m, Distance Traveled: " << distance_traveled << " m\n";
 }
 
 
@@ -190,11 +203,8 @@ void robot::updateArcTrajectory()
     double y_target = y_target_position[current_target_index];
     double x_distance_to = x_target - x_position; //x a y_position su definovane v robot.h ako startovacie parametre 0,0
     double y_distance_to = y_target - y_position;
-
     double distance_to_target = sqrt(x_distance_to * x_distance_to + y_distance_to * y_distance_to);
     double angle_to_target = atan2(y_distance_to, x_distance_to); 
-
-
     //check ci je robot v bode, ak je v bode, tak sa posunie na dalsi bod, ak je vsetky body dosiahnute, tak zastavi
     if ((distance_to_target < target_tolerance) && last_target_reached == false)
     {
@@ -219,81 +229,85 @@ void robot::updateArcTrajectory()
             return;
         }
     }
-
-    if ( 0.4 >= distance_to_target)
+    if(obstacleDetector(distance_to_target, angle_to_target))
     {
-        is_in_vicinity_of_target = true;
-        if (flag == true)
-        {
-            moment_forwardspeed = forwardspeed; // zapisanie rchlosti z ktorej sa spomaluje
-            flag = false;
-        } 
-
-    }
-    else flag = true;
-    
-    //konvert na stupne z gyro jednotiek a zmena do rozsahu -180°~180°, takto sa dobre otoci 
-    double current_heading_rad = gyro_angle * M_PI / 18000.0;
-    heading_error = normalizeAngle(angle_to_target - current_heading_rad);    
-    double error_degrees = heading_error * 180.0 / M_PI;
-    rotationspeed = piRegulator(error_degrees);
-    
-    double desired_forwardspeed = 0;
-    
-    // tu sa bude tocit na mieste. pridame sem podmienky aj ak vyhodnoti ze ide 
-    if (fabs(heading_error) >= M_PI / 2.0)
-    {
-        //robot v tomto pripade velmi rychlo zastane co nechceme
-        desired_forwardspeed = 0; //potom zakomentujeme
+        obstacle_detected = true;
+        cout << "\nObstacle detected: " << obstacle_detected << "\n";
     }
     else
     {
-        //toto je slowing down pri uhloch
-        //toto je proporcionalna hodnota, ako moc je v predu
-        if(cos(heading_error) >= 0.995)
-            integral_error = 0;
-        desired_forwardspeed = max_forward_speed * cos(heading_error);
-        if (desired_forwardspeed < min_forward_speed && distance_to_target > target_tolerance)
-            desired_forwardspeed = min_forward_speed;  // Enforce minimum speed
-    }
-    if (is_in_vicinity_of_target)
-    {
-        // In target vicinity, force monotonic slowdown and keep speed bounded.
-        desired_forwardspeed = moment_forwardspeed * distance_to_target *2;
-        if (desired_forwardspeed < 0)
+       
+        cout << "\nObstacle detected: " << obstacle_detected << "\n";
+        double error_degrees = 0.0;
+        double desired_forwardspeed = 0.0;
+
+        if (!obstacle_detected)
+        {
+            if (0.4 >= distance_to_target)
+            {
+                is_in_vicinity_of_target = true;
+                if (flag == true)
+                {
+                    moment_forwardspeed = forwardspeed;
+                    flag = false;
+                }
+            }
+            else
+            {
+                flag = true;
+                is_in_vicinity_of_target = false;
+            }
+
+            double current_heading_rad = gyro_angle * M_PI / 18000.0;
+            heading_error = normalizeAngle(angle_to_target - current_heading_rad);
+            error_degrees = heading_error * 180.0 / M_PI;
+            rotationspeed = piRegulator(error_degrees);
+
+            if (fabs(heading_error) >= M_PI / 2.0)
+            {
+                desired_forwardspeed = 0;
+            }
+            else
+            {
+                if(cos(heading_error) >= 0.995)
+                    integral_error = 0;
+                desired_forwardspeed = max_forward_speed * cos(heading_error);
+                if (desired_forwardspeed < min_forward_speed && distance_to_target > target_tolerance)
+                    desired_forwardspeed = min_forward_speed;
+            }
+
+            if (is_in_vicinity_of_target)
+            {
+                desired_forwardspeed = moment_forwardspeed * distance_to_target * 2;
+                if (desired_forwardspeed < 0)
+                    desired_forwardspeed = 0;
+                if (desired_forwardspeed > max_forward_speed)
+                    desired_forwardspeed = max_forward_speed;
+            }
+
+            actual_forwardspeed = applySpeedRamp(actual_forwardspeed, desired_forwardspeed, max_forward_speed,
+                                                fwd_scurve_start, fwd_scurve_target,
+                                                fwd_scurve_step, fwd_scurve_total_steps, fwd_scurve_active);
+            if (actual_forwardspeed > max_forward_speed)
+                actual_forwardspeed = max_forward_speed;
+            if (actual_forwardspeed < 0)
+                actual_forwardspeed = 0;
+
+            forwardspeed = actual_forwardspeed;
+        }
+        else
+        {
+            forwardspeed = 0;
             desired_forwardspeed = 0;
-        if (desired_forwardspeed > max_forward_speed)
-            desired_forwardspeed = max_forward_speed;
+        }
+
+        setSpeed(forwardspeed, rotationspeed);
+
+        cout<<"Position: ("<<x_position<<", "<<y_position<<"), Target: ("<<x_target<<", "<<y_target<<"), Distance to Target: "<<distance_to_target<<" m, Heading Error: "<<error_degrees<<" deg, Forward Speed: "<<forwardspeed<<" mm/s, Rotation Speed: "<<rotationspeed<<" deg/s, Obstacle: "<<obstacle_detected<<"\n";
+        cout<<"\n ----- Distance to target: " <<distance_to_target<<" Actual speed: "<<actual_forwardspeed<<" mm/s, Desired forward speed: "<<desired_forwardspeed<<" mm/s, In Vicinity: "<<is_in_vicinity_of_target<<"\n\n";
+
     }
-    
-    actual_forwardspeed = applySpeedRamp(actual_forwardspeed, desired_forwardspeed, max_forward_speed,
-                                        fwd_scurve_start, fwd_scurve_target,
-                                        fwd_scurve_step, fwd_scurve_total_steps, fwd_scurve_active);
-    if (actual_forwardspeed > max_forward_speed)
-        actual_forwardspeed = max_forward_speed;
-    if (actual_forwardspeed < 0)
-        actual_forwardspeed = 0;
-    // //rotation speed uz je already z pi regulatora vypocitana
-    // actual_rotationspeed = applySpeedRamp(actual_rotationspeed, desired_rotationspeed, max_rotation_speed,
-    //                                     rot_scurve_start, rot_scurve_target,
-    //                                     rot_scurve_step, rot_scurve_total_steps, rot_scurve_active);
-    
-    
-
-    
-
-
-    
-    forwardspeed = actual_forwardspeed;
-    //rotationspeed = actual_rotationspeed;
-    
-    setSpeed(forwardspeed, rotationspeed);
-    // Calculate arc radius for trajectory (positive = turn left, negative = turn right)
-    
-    cout<<"Position: ("<<x_position<<", "<<y_position<<"), Target: ("<<x_target<<", "<<y_target<<"), Distance to Target: "<<distance_to_target<<" m, Heading Error: "<<error_degrees<<" deg, Forward Speed: "<<forwardspeed<<" mm/s, Rotation Speed: "<<rotationspeed<<" deg/s\n";
-    cout<<"\n ----- Distance to target: " <<distance_to_target<<" Actual speed: "<<actual_forwardspeed<<" mm/s, Desired forward speed: "<<desired_forwardspeed<<" mm/s, In Vicinity: "<<is_in_vicinity_of_target<<"\n\n";      
 }
-
 
 
 
@@ -301,9 +315,8 @@ void robot::updateArcTrajectory()
 ///toto je calback na data z robota, ktory ste podhodili robotu vo funkcii initAndStartRobot
 /// vola sa vzdy ked dojdu nove data z robota. nemusite nic riesit, proste sa to stane
 int robot::processThisRobot(const TKobukiData &robotdata)
-{    
+{   
     updateOdometry(robotdata);
-
     if(last_target_reached == false)
     {
         updateArcTrajectory();
@@ -315,12 +328,7 @@ int robot::processThisRobot(const TKobukiData &robotdata)
         setSpeed(forwardspeed, rotationspeed);
     }
     cout<<"\n";
-
-
-
-
     //synctimestamp = robotdata.Timestamp; na zadanie 3 
-
     ///kazdy piaty krat, aby to ui moc nepreblikavalo..
     if(datacounter%5==0)
     {
@@ -366,7 +374,7 @@ int robot::processThisLidar(const std::vector<LaserData>& laserData)
 {
 
     copyOfLaserData=laserData;
-
+    updateLidarSegments();
     //tu mozete robit s datami z lidaru.. napriklad najst prekazky, zapisat do mapy. naplanovat ako sa prekazke vyhnut.
     // ale nic vypoctovo narocne - to iste vlakno ktore cita data z lidaru
    // updateLaserPicture=1;
@@ -376,6 +384,111 @@ int robot::processThisLidar(const std::vector<LaserData>& laserData)
 
     return 0;
 
+}
+
+void robot::rotateLidarSegmentsBySteps(int steps)
+{
+    const int segment_count = static_cast<int>(sizeof(lidar_segments) / sizeof(lidar_segments[0]));
+    if (segment_count <= 1)
+        return;
+
+    int normalized_steps = steps % segment_count;
+    if (normalized_steps < 0)
+        normalized_steps += segment_count;
+    if (normalized_steps == 0)
+        return;
+
+    int rotated[80] = {0};
+    for (int i = 0; i < segment_count; i++)
+    {
+        int new_index = (i + normalized_steps) % segment_count;
+        rotated[new_index] = lidar_segments[i];
+    }
+
+    for (int i = 0; i < segment_count; i++)
+        lidar_segments[i] = rotated[i];
+}
+
+void robot::updateLidarSegments()
+{
+    const int segment_count = static_cast<int>(sizeof(lidar_segments) / sizeof(lidar_segments[0]));
+    const size_t total_points = copyOfLaserData.size();
+    const double threshold = 1600.0;
+    const double hysteresis = 750.0;
+
+    if (total_points == 0)
+    {
+        for (int i = 0; i < segment_count; i++)
+            lidar_segments[i] = 0;
+        return;
+    }
+
+    for (int seg = 0; seg < segment_count; seg++)
+    {
+        const size_t start = static_cast<size_t>((static_cast<unsigned long long>(seg) * total_points) / segment_count);
+        const size_t end = static_cast<size_t>((static_cast<unsigned long long>(seg + 1) * total_points) / segment_count);
+
+        if (end <= start)
+        {
+            lidar_segments[seg] = 0;
+            continue;
+        }
+
+        double sum = 0.0;
+        for (size_t i = start; i < end; i++)
+            sum += copyOfLaserData[i].scanDistance;
+
+        const double mean = sum / static_cast<double>(end - start);
+
+        if (mean > threshold)
+            lidar_segments[seg] = 0;
+        else if (mean > hysteresis)
+            lidar_segments[seg] = 1;
+        else
+            lidar_segments[seg] = 2;
+    }
+}
+
+bool robot::obstacleDetector(double distance_to_target, double angle_to_target)
+{
+    const int segment_count = static_cast<int>(sizeof(lidar_segments) / sizeof(lidar_segments[0]));
+    const size_t total_points = copyOfLaserData.size();
+
+    if (total_points == 0 || segment_count <= 0)
+    {
+        obstacle_detected = false;
+        return obstacle_detected;
+    }
+
+    // Convert target direction into robot frame where segment 0 is forward.
+    double current_heading_rad = gyro_angle * M_PI / 18000.0;
+    double relative_angle = normalizeAngle(angle_to_target - current_heading_rad);
+    if (relative_angle < 0)
+        relative_angle += 2.0 * M_PI;
+
+    const double segment_width = (2.0 * M_PI) / static_cast<double>(segment_count);
+    int target_segment = static_cast<int>(relative_angle / segment_width);
+    if (target_segment >= segment_count)
+        target_segment = 0;
+
+    const size_t start = static_cast<size_t>((static_cast<unsigned long long>(target_segment) * total_points) / segment_count);
+    const size_t end = static_cast<size_t>((static_cast<unsigned long long>(target_segment + 1) * total_points) / segment_count);
+
+    if (end <= start)
+    {
+        obstacle_detected = false;
+        return obstacle_detected;
+    }
+
+    double sum = 0.0;
+    for (size_t i = start; i < end; i++)
+        sum += copyOfLaserData[i].scanDistance;
+    const double segment_mean = sum / static_cast<double>(end - start);
+
+    // Obstacle exists if measured LOS distance is shorter than target distance.
+    cout << "\nDistance to target: " << distance_to_target << ", Segment mean: " << segment_mean/100 << "\n";
+    obstacle_detected = (distance_to_target*100 > segment_mean); //na centimetre 
+    return obstacle_detected;
 }
 
   #ifndef DISABLE_OPENCV

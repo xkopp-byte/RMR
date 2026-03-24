@@ -78,8 +78,8 @@ private:
   double y_target = 0;
   // float x_target_position[6] = {0.0, 0.4, 0.4, 0.0, 0.0, 1};
   // float y_target_position[6] = {0.4, 0.4, 0.0, 0.0, 0.4, 0.0};
-  float x_target_position[1] = {1};
-  float y_target_position[1] = {0.5};
+  float x_target_position[1] = {0};
+  float y_target_position[1] = {1.0};
   int curve_steps = 1;
   bool last_target_reached = false;
   bool is_in_vicinity_of_target = false;
@@ -113,16 +113,20 @@ private:
   int rot_scurve_total_steps = 20;
   bool rot_scurve_active = false;
   bool flag = false;
+  bool obstacle_detected = false;
+  int lidar_segments[80] = {0};
+  double lidar_rotation_remainder = 0.0; // gyro units not yet converted to full segment step
 
   // PI regulator parameters
-  double Kp = 0.01*1.2;           // Proportional gain
-  double Ki = 0.0015;          // Integral gain
+  double Kp = 0.01*1.4;           // Proportional gain
+  double Ki = 0.002;          // Integral gain
   double integral_error = 0; // Accumulated integral error
   double max_integral = 10; // Anti-windup limit
   double max_rotation_speed = 30; // max rotation speed deg/s
   double min_forward_speed = 40;   // minimum forward speed mm/s
   double max_forward_speed = 300;  // maximum forward speed mm/s
   double target_tolerance = 0.02;  // target reach tolerance in meters
+
   
   // Arc trajectory variables
   double arc_radius = 0;     // Current arc radius
@@ -162,6 +166,9 @@ private:
 
   /// toto su callbacky co sa sa volaju s novymi datami
   int processThisLidar(const std::vector<LaserData> &laserData);
+  void updateLidarSegments();
+  void rotateLidarSegmentsBySteps(int steps);
+  bool obstacleDetector(double distance_to_target, double angle_to_target);
   int processThisRobot(const TKobukiData &robotdata);
 #ifndef DISABLE_OPENCV
   int processThisCamera(cv::Mat cameraData);
