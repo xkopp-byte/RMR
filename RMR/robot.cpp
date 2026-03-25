@@ -243,12 +243,8 @@ void robot::updateArcTrajectory()
         }
         else if (lidar_segments[0] == 1) // hystereza
         {
-            min_forward_speed = 0;
+            forwardspeed = min_forward_speed;
         }
-//         else if (lidar_segments[0] == 0) // volno
-//         {
-// 
-//         }
     } 
     else
     {
@@ -324,7 +320,7 @@ void robot::updateArcTrajectory()
     }
 }
 
-double robot::candidateDirection()
+double robot::candidateDirection() // toto sa bude mergovat
 {
     double g = 0.0;
 
