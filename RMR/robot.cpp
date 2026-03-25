@@ -233,10 +233,12 @@ void robot::updateArcTrajectory()
     {
         obstacle_detected = true;
         cout << "\nObstacle detected: " << obstacle_detected << "\n";
+        //targetDirection = lidar_segments(candidateDirection());
+
+
     }
     else
     {
-       
         cout << "\nObstacle detected: " << obstacle_detected << "\n";
         double error_degrees = 0.0;
         double desired_forwardspeed = 0.0;
@@ -413,8 +415,8 @@ void robot::updateLidarSegments()
 {
     const int segment_count = static_cast<int>(sizeof(lidar_segments) / sizeof(lidar_segments[0]));
     const size_t total_points = copyOfLaserData.size();
-    const double threshold = 1600.0;
-    const double hysteresis = 750.0;
+    const double threshold_mm = 1500.0;
+    const double hysteresis_mm = 750.0;
 
     if (total_points == 0)
     {
@@ -423,29 +425,78 @@ void robot::updateLidarSegments()
         return;
     }
 
+    std::vector<int> next_segment_state(segment_count, -1);
+    bool has_valid_segment = false;
+
     for (int seg = 0; seg < segment_count; seg++)
     {
         const size_t start = static_cast<size_t>((static_cast<unsigned long long>(seg) * total_points) / segment_count);
         const size_t end = static_cast<size_t>((static_cast<unsigned long long>(seg + 1) * total_points) / segment_count);
 
         if (end <= start)
-        {
-            lidar_segments[seg] = 0;
             continue;
-        }
 
         double sum = 0.0;
+        size_t valid_count = 0;
         for (size_t i = start; i < end; i++)
-            sum += copyOfLaserData[i].scanDistance;
+        {
+            const double scan_mm = copyOfLaserData[i].scanDistance;
+            if (scan_mm <= 0.0)
+                continue;
+            sum += scan_mm;
+            valid_count++;
+        }
 
-        const double mean = sum / static_cast<double>(end - start);
-
-        if (mean > threshold)
-            lidar_segments[seg] = 0;
-        else if (mean > hysteresis)
-            lidar_segments[seg] = 1;
+        if (valid_count == 0)
+            continue;
+        if(lidar_segments[seg] == 3)
+            continue;
+        has_valid_segment = true;
+        const double segment_average_mm = sum / static_cast<double>(valid_count);
+        if (segment_average_mm > threshold_mm)
+            next_segment_state[seg] = 0;
+        else if (segment_average_mm > hysteresis_mm)
+            next_segment_state[seg] = 1;
         else
-            lidar_segments[seg] = 2;
+            next_segment_state[seg] = 2;
+    }
+
+    if (!has_valid_segment)
+    {
+        for (int i = 0; i < segment_count; i++)
+            lidar_segments[i] = 0;
+        return;
+    }
+
+    for (int seg = 0; seg < segment_count; seg++)
+    {
+        if (next_segment_state[seg] != -1)
+            continue;
+
+        for (int offset = 1; offset < segment_count; offset++)
+        {
+            const int left = (seg - offset + segment_count) % segment_count;
+            if (next_segment_state[left] != -1)
+            {
+                next_segment_state[seg] = next_segment_state[left];
+                break;
+            }
+
+            const int right = (seg + offset) % segment_count;
+            if (next_segment_state[right] != -1)
+            {
+                next_segment_state[seg] = next_segment_state[right];
+                break;
+            }
+        }
+
+        if (next_segment_state[seg] == -1)
+            next_segment_state[seg] = 0;
+    }
+
+    for (int seg = 0; seg < segment_count; seg++)
+    {
+        lidar_segments[seg] = next_segment_state[seg];
     }
 }
 
@@ -453,6 +504,7 @@ bool robot::obstacleDetector(double distance_to_target, double angle_to_target)
 {
     const int segment_count = static_cast<int>(sizeof(lidar_segments) / sizeof(lidar_segments[0]));
     const size_t total_points = copyOfLaserData.size();
+    const double mm_to_m = 0.001;
 
     if (total_points == 0 || segment_count <= 0)
     {
@@ -481,13 +533,26 @@ bool robot::obstacleDetector(double distance_to_target, double angle_to_target)
     }
 
     double sum = 0.0;
+    size_t valid_count = 0;
     for (size_t i = start; i < end; i++)
-        sum += copyOfLaserData[i].scanDistance;
-    const double segment_mean = sum / static_cast<double>(end - start);
+    {
+        const double scan_mm = copyOfLaserData[i].scanDistance;
+        if (scan_mm <= 0.0)
+            continue;
+        sum += scan_mm;
+        valid_count++;
+    }
 
-    // Obstacle exists if measured LOS distance is shorter than target distance.
-    cout << "\nDistance to target: " << distance_to_target << ", Segment mean: " << segment_mean/100 << "\n";
-    obstacle_detected = (distance_to_target*100 > segment_mean); //na centimetre 
+    if (valid_count == 0)
+    {
+        obstacle_detected = false;
+        return obstacle_detected;
+    }
+    lidar_segments[target_segment] = 3;
+    const double segment_average_mm = sum / static_cast<double>(valid_count);
+    const double distance_to_target_mm = distance_to_target * 1000.0;
+    cout << "\nDistance to target [mm]: " << distance_to_target_mm << ", Segment average [mm]: " << segment_average_mm << "\n";
+    obstacle_detected = (distance_to_target_mm > segment_average_mm);
     return obstacle_detected;
 }
 
