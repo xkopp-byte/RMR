@@ -231,12 +231,25 @@ void robot::updateArcTrajectory()
     }
     if(obstacleDetector(distance_to_target, angle_to_target))
     {
-        obstacle_detected = true;
+        obstacle_detected = true; // neskor vyriesit globalna vs returnovana
         cout << "\nObstacle detected: " << obstacle_detected << "\n";
-        //targetDirection = lidar_segments(candidateDirection());
-
-
-    }
+        double targetDirection = lidar_segments(candidateDirection());
+        
+        // rotacia na smer ku g
+        rotationspeed = piRegulator(targetDirection*4.5);
+        if(lidar_segments[0] == 2) // prekazka pred robotom
+        {
+            forwardspeed = 0;
+        }
+        else if (lidar_segments[0] == 1) // hystereza
+        {
+            min_forward_speed = 0;
+        }
+//         else if (lidar_segments[0] == 0) // volno
+//         {
+// 
+//         }
+    } 
     else
     {
         cout << "\nObstacle detected: " << obstacle_detected << "\n";
@@ -311,6 +324,16 @@ void robot::updateArcTrajectory()
     }
 }
 
+double robot::candidateDirection()
+{
+    double g = 0.0;
+
+
+
+
+
+    return g;
+}
 
 
 

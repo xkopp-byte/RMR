@@ -134,6 +134,12 @@ private:
   double heading_error = 0;   // Error between current heading and target angle
   int current_target_index = 0; // Index in target array
 
+  // Candidate direction
+  double mi_1 = 1;
+  double mi_2 = 1;
+  double mi_3 = 1;
+  double candidateDirection();
+
   // Helper functions for PI regulation
   double calculateAngleToTarget(double x_curr, double y_curr, double x_tgt, double y_tgt);
   double normalizeAngle(double angle);
