@@ -78,8 +78,8 @@ private:
   double y_target = 0;
   // float x_target_position[6] = {0.0, 0.4, 0.4, 0.0, 0.0, 1};
   // float y_target_position[6] = {0.4, 0.4, 0.0, 0.0, 0.4, 0.0};
-  float x_target_position[1] = {0};
-  float y_target_position[1] = {2.5};
+  float x_target_position[1] = {4.0};
+  float y_target_position[1] = {3.0};
   int curve_steps = 1;
   bool last_target_reached = false;
   bool is_in_vicinity_of_target = false;
@@ -118,8 +118,8 @@ private:
   double lidar_rotation_remainder = 0.0; // gyro units not yet converted to full segment step
 
   // PI regulator parameters
-  double Kp = 0.01*1.4;           // Proportional gain
-  double Ki = 0.002;          // Integral gain
+  double Kp = 0.01*1;           // Proportional gain
+  double Ki = 0.001;          // Integral gain
   double integral_error = 0; // Accumulated integral error
   double max_integral = 10; // Anti-windup limit
   double max_rotation_speed = 30; // max rotation speed deg/s
@@ -139,6 +139,7 @@ private:
   double normalizeAngle(double angle);
   double piRegulator(double error);
   void updateArcTrajectory();
+  int candidateDirection();
   
   // Odometry function - calculates position and distance traveled since last call
   void updateOdometry(const TKobukiData &robotdata);
