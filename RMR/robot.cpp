@@ -1,4 +1,6 @@
 #include "robot.h"
+#include <algorithm>
+#include <cmath>
 #include <limits>
 #include <vector>
 
@@ -105,7 +107,6 @@ void robot::updateOdometry(const TKobukiData &robotdata)
     enc_right = robotdata.EncoderRight;
     gyro_angle = robotdata.GyroAngle - gyro_correction;
 
-    //GYROOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOO
     // Keep lidar segment indexing aligned with robot heading (segment 0 = forward).
     // 36000 gyro units = 360 degrees, so one of 80 segments is 450 gyro units.
     double delta_gyro_units = gyro_angle - gyro_angle_prev;
@@ -117,13 +118,11 @@ void robot::updateOdometry(const TKobukiData &robotdata)
     const int segment_steps = static_cast<int>(lidar_rotation_remainder / segment_gyro_units);
     rotateLidarSegmentsBySteps(segment_steps);
     lidar_rotation_remainder -= static_cast<double>(segment_steps) * segment_gyro_units;
-    cout << "\ngyro_delta=" << delta_gyro_units
-            << " steps=" << segment_steps << " " << "\n";
+    //cout << "\ngyro_delta=" << delta_gyro_units << " steps=" << segment_steps << " " << "\n";
         for (int i = 0; i < 80; i++)
     {
         cout << lidar_segments[i];
     }
-    //GYROOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOO
     double delta_enc_left = enc_left - enc_left_prev;
     double delta_enc_right = enc_right - enc_right_prev;
     if (delta_enc_left > 32767) delta_enc_left -= 65536;
@@ -153,7 +152,7 @@ void robot::updateOdometry(const TKobukiData &robotdata)
     // Update previous encoder values for next iteration
     enc_left_prev = enc_left;
     enc_right_prev = enc_right;
-    cout << "\nOdometry Update - X: " << x_position << " m, Y: " << y_position << " m, Distance Traveled: " << distance_traveled << " m\n";
+    //cout << "\nOdometry Update - X: " << x_position << " m, Y: " << y_position << " m, Distance Traveled: " << distance_traveled << " m\n";
 }
 
 
@@ -198,79 +197,86 @@ double robot::applySpeedRamp(double current, double target, double max_speed,
 }
 int robot::candidateDirection()
 {
-    static int lastCandidate = 0;
-    static int lastFinish = 0;
-    static int finish = 0, candidate = 0, mi1 = 1, mi2 = 1, mi3 = 1;
-    static float fitness = 0;
-
     const int segment_count = static_cast<int>(sizeof(lidar_segments) / sizeof(lidar_segments[0]));
-    std::vector<int> candidates;
-
-    auto isBoundary = [](int value) -> bool {
-        return value == 1 || value == 3;
-    };
-
-    finish = lastFinish;
+    
+    // Find finish: the single 3, 4, or 5 marker
+    int finish = -1;
     for (int i = 0; i < segment_count; i++)
     {
-        if (lidar_segments[i] == 3)
+        if (lidar_segments[i] >= 3 && lidar_segments[i] <= 5)
         {
             finish = i;
             break;
         }
     }
-
-    for (int i = 1; i < segment_count - 1;)
-    {
-        if (lidar_segments[i] != 0 || !isBoundary(lidar_segments[i - 1]))
-        {
-            i++;
-            continue;
-        }
-
-        const int start = i;
-        while (i < segment_count && lidar_segments[i] == 0)
-            i++;
-        const int end = i - 1;
-
-        if (i >= segment_count || !isBoundary(lidar_segments[i]))
-            continue;
-
-        const int gap_len = end - start + 1;
-        if (gap_len >= 5)
-        {
-            candidates.push_back(start);
-            candidates.push_back(end);
-        }
-        else
-        {
-            candidates.push_back((start + end) / 2);
-        }
-    }
-
-    if (candidates.empty())
+    
+    if (finish == -1)
         return -1;
-
-    float best_fitness = std::numeric_limits<float>::infinity();
-    int best_candidate = candidates[0];
-
-    for (int c : candidates)
+    
+    // Find candidates: 
+    // - Sectors with value 0 and at least one neighbor (1/2/4/5)
+    // - Sectors with value 3 and at least one neighbor 0
+    std::vector<int> candidates;
+    
+    for (int i = 0; i < segment_count; i++)
     {
-        candidate = c;
-        fitness =   mi1 * (candidate + finish) +
-                    mi2 * (candidate) +
-                    mi3 * (candidate + lastCandidate);
-
-        if (fitness < best_fitness || (fitness == best_fitness && candidate < best_candidate))
+        int left = (i - 1 + segment_count) % segment_count;
+        int right = (i + 1) % segment_count;
+        int left_val = lidar_segments[left];
+        int right_val = lidar_segments[right];
+        
+        // Candidate: value 0 with neighbouring 1/2/4/5
+        if (lidar_segments[i] == 0)
         {
-            best_fitness = fitness;
-            best_candidate = candidate;
+            bool has_obstacle_neighbor = 
+                (left_val >= 1 && left_val <= 2) || (left_val == 4 || left_val == 5) ||
+                (right_val >= 1 && right_val <= 2) || (right_val == 4 || right_val == 5);
+            
+            if (has_obstacle_neighbor)
+                candidates.push_back(i);
         }
-        cout << "Candidate: " << candidate << ", Finish: " << finish << ", LastCandidate: " << lastCandidate << ", Fitness: " << fitness << "\n";
+        
+        // Candidate: value 3 with neighbouring 0
+        if (lidar_segments[i] == 3)
+        {
+            if (left_val == 0 || right_val == 0)
+                candidates.push_back(i);
+        }
     }
     
-    lastCandidate = best_candidate;
-    lastFinish = finish;
+    if (candidates.empty())
+        return -1;
+    
+    // Score candidates and pick best
+    static int last_candidate = 0;
+    float best_fitness = std::numeric_limits<float>::infinity();
+    int best_candidate = candidates[0];
+    
+    for (int c : candidates)
+    {
+        const int direct_finish = std::abs(c - finish);
+        const int finish_distance = std::min(direct_finish, segment_count - direct_finish);
+        const int rotate_distance = std::min(c, segment_count - c);
+        const int direct_change = std::abs(c - last_candidate);
+        const int change_distance = std::min(direct_change, segment_count - direct_change);
+        
+        float fitness = mi1 * finish_distance + mi2 * rotate_distance + mi3 * change_distance;
+        
+        if (fitness < best_fitness)
+        {
+            best_fitness = fitness;
+            best_candidate = c;
+        }
+        
+        cout << "Candidate: " << c
+             << ", FinishDistance: " << finish_distance
+             << ", RotateDistance: " << rotate_distance
+             << ", ChangeDistance: " << change_distance
+             << ", Fitness: " << fitness << "\n";
+    }
+    
+    last_candidate = best_candidate;
+    cout << "Chosen Candidate: " << best_candidate << "\n";
     return best_candidate;
 }
 
@@ -307,22 +313,60 @@ void robot::updateArcTrajectory()
             return;
         }
     }
-    if(obstacleDetector(distance_to_target, angle_to_target))
+    const bool previous_obstacle_state = obstacle_detected;
+    const bool obstacle_now = obstacleDetector(distance_to_target, angle_to_target);
+    if (obstacle_now != previous_obstacle_state)
+        integral_error = 0;
+    obstacle_detected = obstacle_now;
+
+    if(obstacle_detected)
     {
-        obstacle_detected = true; // neskor vyriesit globalna vs returnovana
         cout << "\nObstacle detected: " << obstacle_detected << "\n";
-        double targetDirection = lidar_segments[candidateDirection()];
-        
-        // rotacia na smer ku g
-        rotationspeed = piRegulator(targetDirection*4.5);
-        if(lidar_segments[0] == 2) // prekazka pred robotom
+
+        const int candidate_idx = candidateDirection();
+        if (candidate_idx >= 0 && candidate_idx < 40)
         {
-            forwardspeed = 0;
+            rotationspeed = -0.5;
         }
-        else if (lidar_segments[0] == 1) // hystereza
+        else if (candidate_idx >= 40 && candidate_idx < 80)
         {
-            forwardspeed = min_forward_speed;
+            rotationspeed = 0.5;
         }
+        else
+        {
+            rotationspeed = 0;
+        }
+
+        // Front segment may be target-encoded (3/4/5), map it back to 0/1/2 behavior.
+        int front_state = lidar_segments[0];
+        if (front_state >= 3)
+            front_state -= 3;
+        if (front_state < 0)
+            front_state = 0;
+        if (front_state > 2)
+            front_state = 2;
+
+        double desired_forwardspeed = 0.0;
+        if (front_state == 0)
+            desired_forwardspeed = max_forward_speed;
+        else if (front_state == 1)
+            desired_forwardspeed = max_forward_speed * 0.5;
+        else
+            desired_forwardspeed = 0.0;
+
+        actual_forwardspeed = applySpeedRamp(actual_forwardspeed, desired_forwardspeed, max_forward_speed,
+                                            fwd_scurve_start, fwd_scurve_target,
+                                            fwd_scurve_step, fwd_scurve_total_steps, fwd_scurve_active);
+        if (actual_forwardspeed > max_forward_speed)
+            actual_forwardspeed = max_forward_speed;
+
+        forwardspeed = actual_forwardspeed;
+        setSpeed(forwardspeed, rotationspeed);
+
+        cout << "Obstacle mode - Candidate: " << candidate_idx
+             << ", FrontState: " << front_state
+             << ", Forward Speed: " << forwardspeed
+             << ", Rotation Speed: " << rotationspeed << "\n";
     } 
     else
     {
@@ -501,8 +545,12 @@ void robot::updateLidarSegments()
 {
     const int segment_count = static_cast<int>(sizeof(lidar_segments) / sizeof(lidar_segments[0]));
     const size_t total_points = copyOfLaserData.size();
-    const double threshold_mm = 1500.0;
-    const double hysteresis_mm = 750.0;
+    const double min_inflate_angle_deg = 4.0;
+    // Dynamic safety radius: base robot radius * 1.2 plus speed-dependent margin.
+    const double robot_radius_m = wheel_base_distance * 0.5;
+    const double speed_m_per_s = std::max(0.0, forwardspeed) * 0.001;
+    const double safety_radius_m = (robot_radius_m * 1.7) + (0.3 * speed_m_per_s);
+    const double segment_width_rad = (2.0 * M_PI) / static_cast<double>(segment_count);
 
     if (total_points == 0)
     {
@@ -512,6 +560,7 @@ void robot::updateLidarSegments()
     }
 
     std::vector<int> next_segment_state(segment_count, -1);
+    std::vector<double> segment_average_values_mm(segment_count, -1.0);
     bool has_valid_segment = false;
 
     for (int seg = 0; seg < segment_count; seg++)
@@ -537,11 +586,12 @@ void robot::updateLidarSegments()
             continue;
         
         has_valid_segment = true;
-        const double segment_average_mm = sum / static_cast<double>(valid_count);
+        const double average_mm = sum / static_cast<double>(valid_count);
+        segment_average_values_mm[seg] = average_mm;
  
-        if (segment_average_mm > threshold_mm)
+        if (average_mm > this->threshold_mm)
             next_segment_state[seg] = 0;
-        else if (segment_average_mm > hysteresis_mm)
+        else if (average_mm > this->hysteresis_mm)
             next_segment_state[seg] = 1;
         else
             next_segment_state[seg] = 2;
@@ -553,6 +603,41 @@ void robot::updateLidarSegments()
             lidar_segments[i] = 0;
         return;
     }
+
+    // Inflate obstacle influence based on trigonometric angular footprint.
+    // One lidar reading can therefore influence neighboring segments.
+    std::vector<int> inflated_state = next_segment_state;
+    for (int seg = 0; seg < segment_count; seg++)
+    {
+        if (next_segment_state[seg] < 1)
+            continue;
+        if (segment_average_values_mm[seg] <= 0.0)
+            continue;
+
+        const double distance_m = segment_average_values_mm[seg] * 0.001;
+        if (distance_m <= 0.0)
+            continue;
+
+        const double ratio = std::clamp(safety_radius_m / distance_m, 0.0, 1.0);
+        const double spread_angle_rad = std::asin(ratio);
+        const double spread_angle_deg = spread_angle_rad * 180.0 / M_PI;
+        if (spread_angle_deg <= min_inflate_angle_deg)
+            continue;
+
+        const int spread_steps = static_cast<int>(std::ceil(spread_angle_rad / segment_width_rad));
+        for (int offset = 1; offset <= spread_steps; offset++)
+        {
+            const int left = (seg - offset + segment_count) % segment_count;
+            const int right = (seg + offset) % segment_count;
+
+            if (inflated_state[left] < next_segment_state[seg])
+                inflated_state[left] = next_segment_state[seg];
+            if (inflated_state[right] < next_segment_state[seg])
+                inflated_state[right] = next_segment_state[seg];
+        }
+    }
+
+    next_segment_state.swap(inflated_state);
 
     for (int seg = 0; seg < segment_count; seg++)
     {
@@ -590,7 +675,6 @@ bool robot::obstacleDetector(double distance_to_target, double angle_to_target)
 {
     const int segment_count = static_cast<int>(sizeof(lidar_segments) / sizeof(lidar_segments[0]));
     const size_t total_points = copyOfLaserData.size();
-    const double mm_to_m = 0.001;
 
     if (total_points == 0 || segment_count <= 0)
     {
@@ -621,7 +705,7 @@ bool robot::obstacleDetector(double distance_to_target, double angle_to_target)
         obstacle_detected = false;
         return obstacle_detected;
     }
-    cout << "\n angle to target [deg]: " << angle_to_target * 180.0 / M_PI << ", Relative angle [deg]: " << relative_angle * 180.0 / M_PI << ", Clockwise angle [deg]: " << clockwise_angle * 180.0 / M_PI << ", Target segment: " << target_segment << "\n";
+    //cout << "\n angle to target [deg]: " << angle_to_target * 180.0 / M_PI << ", Relative angle [deg]: " << relative_angle * 180.0 / M_PI << ", Clockwise angle [deg]: " << clockwise_angle * 180.0 / M_PI << ", Target segment: " << target_segment << "\n";
     double sum = 0.0;
     size_t valid_count = 0;
     for (size_t i = start; i < end; i++)
@@ -630,7 +714,6 @@ bool robot::obstacleDetector(double distance_to_target, double angle_to_target)
         if (scan_mm <= 0.0)
             continue;
         sum += scan_mm;
-        cout << "\nLidar scan in target segment: " << scan_mm << " mm";
         valid_count++;
     }
 
@@ -639,11 +722,20 @@ bool robot::obstacleDetector(double distance_to_target, double angle_to_target)
         obstacle_detected = false;
         return obstacle_detected;
     }
-    lidar_segments[target_segment] = 3;
+    
     const double segment_average_mm = sum / static_cast<double>(valid_count);
     const double distance_to_target_mm = distance_to_target * 1000.0;
-    cout << "\nDistance to target [mm]: " << distance_to_target_mm << ", Segment average [mm]: " << segment_average_mm << "\n";
+    //cout << "\nDistance to target [mm]: " << distance_to_target_mm << ", Segment average [mm]: " << segment_average_mm << "\n";
     obstacle_detected = (distance_to_target_mm > segment_average_mm);
+    
+    // Encode distance information with target marker (3, 4, or 5)
+    if (segment_average_mm > this->threshold_mm)
+        lidar_segments[target_segment] = 3;  // Target + far (like 0)
+    else if (segment_average_mm > this->hysteresis_mm)
+        lidar_segments[target_segment] = 4;  // Target + medium (like 1)
+    else
+        lidar_segments[target_segment] = 5;  // Target + close (like 2)
+    
     return obstacle_detected;
 }
 

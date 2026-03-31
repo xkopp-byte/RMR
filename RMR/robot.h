@@ -32,7 +32,6 @@ public:
   void setSpeedVal(double forw, double rots);
   // tato funkcia fyzicky posiela hodnoty do robota
   void setSpeed(double forw, double rots);
-  void updateArcTrajectory(int current_target_index);
 
 signals:
   void publishPosition(double x, double y, double z);
@@ -61,8 +60,6 @@ private:
   double enc_right = 0;
   double enc_left_prev = 0;  // Previous encoder values for delta calculation
   double enc_right_prev = 0;
-  double enc_left_distance = 0;
-  double enc_right_distance = 0;
   double delta_left_distance = 0;  // Distance traveled since last call
   double delta_right_distance = 0;
   double distance_traveled = 0;    // Total distance traveled since last call (average of both wheels)
@@ -74,29 +71,15 @@ private:
   double wheel_base_distance = 0.23; // vzdialenost medzi kolesami v metroch
   double x_position = 0;
   double y_position = 0;
-  double x_target = 0;
-  double y_target = 0;
   // float x_target_position[6] = {0.0, 0.4, 0.4, 0.0, 0.0, 1};
   // float y_target_position[6] = {0.4, 0.4, 0.0, 0.0, 0.4, 0.0};
-  float x_target_position[1] = {4.0};
-  float y_target_position[1] = {3.0};
-  int curve_steps = 1;
+  float x_target_position[2] = {4, 0.0};
+  float y_target_position[2] = {4, 0.0};
   bool last_target_reached = false;
   bool is_in_vicinity_of_target = false;
 
-  // S-curve velocity ramping parameters
-  double scurve_progress = 0.0;     // Current progress through S-curve (0 to 1)
-  double scurve_current_pct = 0.0;  // Current velocity as percentage (0 to 1)
-  double scurve_target_pct = 0.0;   // Target velocity as percentage (0 to 1)
-  double scurve_start_pct = 0.0;    // Starting velocity percentage when ramp began
-  int scurve_total_steps = 20;      // Total steps to complete S-curve ramp
-  int scurve_current_step = 0;      // Current step in the ramp
-  bool scurve_active = false;       // Is S-curve ramping active
-  
   // Actual speeds being sent to robot (smoothed by S-curve)
   double actual_forwardspeed = 0.0;
-  double actual_rotationspeed = 0.0;
-  double speed_change_threshold = 0.15; // 15% threshold for using S-curve
   double moment_forwardspeed;
   
   // S-curve ramping for forward speed
@@ -105,39 +88,32 @@ private:
   int fwd_scurve_step = 0;
   int fwd_scurve_total_steps = 20;
   bool fwd_scurve_active = false;
-  
-  // S-curve ramping for rotation speed
-  double rot_scurve_start = 0.0;
-  double rot_scurve_target = 0.0;
-  int rot_scurve_step = 0;
-  int rot_scurve_total_steps = 20;
-  bool rot_scurve_active = false;
+
   bool flag = false;
   bool obstacle_detected = false;
   int lidar_segments[80] = {0};
   double lidar_rotation_remainder = 0.0; // gyro units not yet converted to full segment step
 
   // PI regulator parameters
-  double Kp = 0.01*1;           // Proportional gain
+  double Kp = 0.01*1.6;           // Proportional gain
   double Ki = 0.001;          // Integral gain
   double integral_error = 0; // Accumulated integral error
   double max_integral = 10; // Anti-windup limit
-  double max_rotation_speed = 30; // max rotation speed deg/s
+  double max_rotation_speed = 0.2; // max rotation speed deg/s
   double min_forward_speed = 40;   // minimum forward speed mm/s
   double max_forward_speed = 300;  // maximum forward speed mm/s
   double target_tolerance = 0.02;  // target reach tolerance in meters
 
+  double threshold_mm = 1200.0;
+  double hysteresis_mm = 500.0;
+  double mi1 = 2.0; //finish_distance
+  double mi2 = 2.0; //rotate_to_candidate_distance
+  double mi3 = 1.0; //candidate_change_distance
+
   
   // Arc trajectory variables
-  double arc_radius = 0;     // Current arc radius
-  double angle_to_target = 0; // Angle from robot to target
   double heading_error = 0;   // Error between current heading and target angle
   int current_target_index = 0; // Index in target array
-
-  // Candidate direction
-  // double mi_1 = 1;
-  // double mi_2 = 1;
-  // double mi_3 = 1;
 
   // Helper functions for PI regulation
   double calculateAngleToTarget(double x_curr, double y_curr, double x_tgt, double y_tgt);
@@ -148,27 +124,14 @@ private:
   
   // Odometry function - calculates position and distance traveled since last call
   void updateOdometry(const TKobukiData &robotdata);
-  
-  // S-curve velocity ramping functions
-  double sCurveRamp(double current_pct, double target_pct);
-  void startSCurveRamp(double target_pct, int steps = 20);
-  double smootherstep(double t);
+
   double applySpeedRamp(double current, double target, double max_speed, 
                         double& ramp_start, double& ramp_target, 
                         int& ramp_step, int& ramp_total_steps, bool& ramp_active);
-
-  enum CURVE_STATE
-  {
-    CURVE_CHANGING,
-    CURVE_FINAL
-  };
-  CURVE_STATE curve_state = CURVE_FINAL;
 // nase privat premenne ^^^^^^^^^^^^^^^^^
 // nase pomocne funkcie
 
 // nase pomocne funkcie ^^^^^^^^^^^^^^^^^
-  double curve_modulation(double low, double high);
-  double regulator(double error);
 
   /// toto su callbacky co sa sa volaju s novymi datami
   int processThisLidar(const std::vector<LaserData> &laserData);
@@ -176,6 +139,12 @@ private:
   void rotateLidarSegmentsBySteps(int steps);
   bool obstacleDetector(double distance_to_target, double angle_to_target);
   int processThisRobot(const TKobukiData &robotdata);
+
+  
+  inline bool isTarget(int segment_value) {
+    // Returns true if segment is marked as target (3, 4, or 5)
+    return segment_value >= 3 && segment_value <= 5;
+  }
 #ifndef DISABLE_OPENCV
   int processThisCamera(cv::Mat cameraData);
 #endif
