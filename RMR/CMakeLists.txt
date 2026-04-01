@@ -7,6 +7,7 @@ set(SOURCES
 set(HEADERS
     mainwindow.h
     robot.h
+    mapping.h
 )
 
 if(NOT DISABLE_JOYSTICK)
