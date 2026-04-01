@@ -33,8 +33,17 @@ public:
   // tato funkcia fyzicky posiela hodnoty do robota
   void setSpeed(double forw, double rots);
 
+  void setTargetXY(double x_target, double y_target)
+  {
+    x_target_position[0] = x_target;
+    y_target_position[0] = y_target;
+    last_target_reached = false; // reset target reached flag for new target
+    current_target_index = 0; // reset to first target index
+    cout << "New target set: (" << x_target << ", " << y_target << ")\n";
+  }
+
 signals:
-  void publishPosition(double x, double y, double z);
+  void publishPosition(double x, double y, double z, bool obstacle_detected);
   void publishLidar(const std::vector<LaserData> &lidata);
 #ifndef DISABLE_OPENCV
   void publishCamera(const cv::Mat &camframe);
@@ -73,8 +82,8 @@ private:
   double y_position = 0;
   // float x_target_position[6] = {0.0, 0.4, 0.4, 0.0, 0.0, 1};
   // float y_target_position[6] = {0.4, 0.4, 0.0, 0.0, 0.4, 0.0};
-  float x_target_position[2] = {0, 0.0};
-  float y_target_position[2] = {4, 0.0};
+  float x_target_position[1] = {3};
+  float y_target_position[1] = {0};
   bool last_target_reached = false;
   bool is_in_vicinity_of_target = false;
 
