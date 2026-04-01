@@ -96,15 +96,15 @@ private:
 
   // PI regulator parameters
   double Kp = 0.01*1.6;           // Proportional gain
-  double Ki = 0.001;          // Integral gain
+  double Ki = 0.001*1.2;          // Integral gain
   double integral_error = 0; // Accumulated integral error
   double max_integral = 10; // Anti-windup limit
-  double max_rotation_speed = 0.2; // max rotation speed deg/s
+  double max_rotation_speed = 2; // max rotation speed deg/s
   double min_forward_speed = 40;   // minimum forward speed mm/s
   double max_forward_speed = 300;  // maximum forward speed mm/s
-  double target_tolerance = 0.02;  // target reach tolerance in meters
+  double target_tolerance = 0.02;  // target reach tolerance sin meters
 
-  double threshold_mm = 1200.0;
+  double threshold_mm = 850.0;
   double hysteresis_mm = 500.0;
   double mi1 = 2.0; //finish_distance
   double mi2 = 2.0; //rotate_to_candidate_distance

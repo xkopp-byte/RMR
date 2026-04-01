@@ -324,20 +324,39 @@ void robot::updateArcTrajectory()
         cout << "\nObstacle detected: " << obstacle_detected << "\n";
 
         const int candidate_idx = candidateDirection();
-        if (candidate_idx >= 0 && candidate_idx < 40)
+        const int segment_count = static_cast<int>(sizeof(lidar_segments) / sizeof(lidar_segments[0]));
+        const double segment_angle_deg = 360.0 / static_cast<double>(segment_count);
+        bool use_pi_for_obstacle_turn = false;
+        double candidate_error_deg = 0.0;
+        bool has_free_segment = false;
+
+        for (int i = 0; i < segment_count; i++)
         {
-            rotationspeed = -0.5;
-        }
-        else if (candidate_idx >= 40 && candidate_idx < 80)
-        {
-            rotationspeed = 0.5;
-        }
-        else
-        {
-            rotationspeed = 0;
+            if (lidar_segments[i] == 0)
+            {
+                has_free_segment = true;
+                break;
+            }
         }
 
-        // Front segment may be target-encoded (3/4/5), map it back to 0/1/2 behavior.
+        if (candidate_idx > 0 && candidate_idx < segment_count)
+        {
+            if (candidate_idx < (segment_count / 2))
+                candidate_error_deg = -static_cast<double>(candidate_idx) * segment_angle_deg;
+            else
+                candidate_error_deg = static_cast<double>(segment_count - candidate_idx) * segment_angle_deg;
+
+            if (fabs(candidate_error_deg) <= 90.0)
+            {
+                rotationspeed = piRegulator(candidate_error_deg);
+                use_pi_for_obstacle_turn = true;
+            }
+            else
+            {
+                use_pi_for_obstacle_turn = false;
+                candidate_error_deg > 90.0 ? rotationspeed = max_rotation_speed : rotationspeed = -max_rotation_speed;
+            }
+        }
         int front_state = lidar_segments[0];
         if (front_state >= 3)
             front_state -= 3;
@@ -347,12 +366,18 @@ void robot::updateArcTrajectory()
             front_state = 2;
 
         double desired_forwardspeed = 0.0;
-        if (front_state == 0)
-            desired_forwardspeed = max_forward_speed;
-        else if (front_state == 1)
-            desired_forwardspeed = max_forward_speed * 0.5;
-        else
-            desired_forwardspeed = 0.0;
+        if (use_pi_for_obstacle_turn)
+        {
+            if (front_state == 0)
+                desired_forwardspeed = max_forward_speed;
+            else if (front_state == 1)
+                desired_forwardspeed = max_forward_speed * 0.5;
+            else
+                desired_forwardspeed -= 1;
+        }
+
+        if (!has_free_segment)
+            desired_forwardspeed = -20.0;
 
         actual_forwardspeed = applySpeedRamp(actual_forwardspeed, desired_forwardspeed, max_forward_speed,
                                             fwd_scurve_start, fwd_scurve_target,
@@ -364,9 +389,12 @@ void robot::updateArcTrajectory()
         setSpeed(forwardspeed, rotationspeed);
 
         cout << "Obstacle mode - Candidate: " << candidate_idx
+               << ", Candidate Error: " << candidate_error_deg
              << ", FrontState: " << front_state
              << ", Forward Speed: " << forwardspeed
              << ", Rotation Speed: " << rotationspeed << "\n";
+
+             
     } 
     else
     {
@@ -546,10 +574,8 @@ void robot::updateLidarSegments()
     const int segment_count = static_cast<int>(sizeof(lidar_segments) / sizeof(lidar_segments[0]));
     const size_t total_points = copyOfLaserData.size();
     const double min_inflate_angle_deg = 4.0;
-    // Dynamic safety radius: base robot radius * 1.2 plus speed-dependent margin.
-    const double robot_radius_m = wheel_base_distance * 0.5;
     const double speed_m_per_s = std::max(0.0, forwardspeed) * 0.001;
-    const double safety_radius_m = (robot_radius_m * 1.7) + (0.3 * speed_m_per_s);
+    const double safety_radius_m = (wheel_base_distance) + (0.1 * speed_m_per_s);
     const double segment_width_rad = (2.0 * M_PI) / static_cast<double>(segment_count);
 
     if (total_points == 0)
