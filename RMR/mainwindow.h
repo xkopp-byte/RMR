@@ -43,7 +43,8 @@ public:
   ~MainWindow();
 
 private slots:
-  void on_pushButton_9_clicked();
+ void on_Set_XY_button_clicked();
+ void on_pushButton_9_clicked();
 
   void on_pushButton_2_clicked();
 
@@ -80,7 +81,7 @@ private:
   QJoysticks *instance;
 #endif
 public slots:
-  void setUiValues(double robotX, double robotY, double robotFi);
+  void setUiValues(double robotX, double robotY, double robotFi, bool obstacle);
 };
 
 #endif // MAINWINDOW_H

@@ -480,7 +480,7 @@ int robot::processThisRobot(const TKobukiData &robotdata)
         /// okno pocuva vo svojom slote a vasu premennu nastavi tak ako chcete. prikaz emit to presne takto spravi
         /// viac o signal slotoch tu: https://doc.qt.io/qt-5/signalsandslots.html
         ///posielame sem nezmysli.. pohrajte sa nech sem idu zmysluplne veci
-        emit publishPosition(robotdata.EncoderLeft,y,fi);
+        emit publishPosition(x_position, y_position, gyro_angle/100, obstacle_detected);
         ///toto neodporucam na nejake komplikovane struktury.signal slot robi kopiu dat. radsej vtedy posielajte
         /// prazdny signal a slot bude vykreslovat strukturu (vtedy ju musite mat samozrejme ako member premmennu v mainwindow.ak u niekoho najdem globalnu premennu,tak bude cistit bludisko zubnou kefkou.. kefku dodam)
         /// vtedy ale odporucam pouzit mutex, aby sa vam nestalo ze budete pocas vypisovania prepisovat niekde inde
@@ -728,6 +728,11 @@ bool robot::obstacleDetector(double distance_to_target, double angle_to_target)
         obstacle_detected = false;
         return obstacle_detected;
     }
+
+    // if(lidar_segments[0] == 2 || lidar_segments[0] == 5)
+    // {
+    //     obstacle_detected = true;
+    // }
     
     const double segment_average_mm = sum / static_cast<double>(valid_count);
     const double distance_to_target_mm = distance_to_target * 1000.0;
