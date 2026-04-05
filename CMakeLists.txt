@@ -1,9 +1,10 @@
 cmake_minimum_required(VERSION 3.16)
 project(RMR VERSION 1.0 LANGUAGES CXX)
 
-option(DISABLE_OPENCV "Disable OpenCV support" ON)
+option(DISABLE_OPENCV "Disable OpenCV support" OFF)
 option(DISABLE_SKELETON "Disable skeleton module" OFF)
 option(DISABLE_JOYSTICK "Disable joystick support" ON)
+option(DISABLE_MAPPING "Disable mapping visualization" OFF)
 
 set(CMAKE_AUTOUIC ON)
 set(CMAKE_AUTOMOC ON)
@@ -15,6 +16,10 @@ set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 find_package(Qt6 REQUIRED COMPONENTS Core Widgets Gui Network)
 
 find_package(librobot REQUIRED)
+
+if(NOT DISABLE_OPENCV OR NOT DISABLE_MAPPING)
+    find_package(OpenCV REQUIRED)
+endif()
 
 if(NOT DISABLE_JOYSTICK)
     add_subdirectory(QJoysticks-master QJoysticks_build)

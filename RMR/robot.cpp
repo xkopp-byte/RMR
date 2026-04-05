@@ -520,6 +520,13 @@ int robot::processThisLidar(const std::vector<LaserData>& laserData)
     emit publishLidar(copyOfLaserData);
    // update();//tento prikaz prinuti prekreslit obrazovku.. zavola sa paintEvent funkcia
 
+//    cout << "Lidar data received: " << laserData.size() << " points\n";
+//    cout << "lidar data structure: \n";
+//    for (size_t i = 0; i < std::min(laserData.size(), static_cast<size_t>(276)); i++)
+//    {
+//        cout << "Point " << i << ": Distance = " << laserData[i].scanDistance << " mm, Angle = " << laserData[i].scanAngle << " deg\n";
+//    }
+
 
     return 0;
 

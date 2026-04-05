@@ -118,7 +118,24 @@ void MainWindow::on_pushButton_9_clicked() //start button
 
 
     //tu sa nastartuju vlakna ktore citaju data z lidaru a robota
+    cout << "\n=== BUTTON CLICKED ===\n";
+    #ifndef DISABLE_MAPPING
+    cout << "\nCreating mapper and visualizer...\n---------------\n";
+    qRegisterMetaType<std::vector<LaserData>>("std::vector<LaserData>");
+    
 
+    // Create mapper and visualizer
+    mapper_ = new Mapping(this);
+    visualizer_ = new MapVisualizer(mapper_, nullptr);
+    
+    // Connect robot signals to mapper
+    connect(&_robot, SIGNAL(publishLidar(const std::vector<LaserData>&)),
+            mapper_, SLOT(onLidarData(const std::vector<LaserData>&)), Qt::QueuedConnection);
+    connect(&_robot, SIGNAL(publishPosition(double, double, double, bool)),
+            mapper_, SLOT(onRobotPosition(double, double, double, bool)), Qt::QueuedConnection);
+    
+    visualizer_->show();
+    #endif
 
 
     connect(&_robot,SIGNAL(publishPosition(double,double,double, bool)),this,SLOT(setUiValues(double,double,double, bool)));

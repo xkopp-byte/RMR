@@ -16,6 +16,10 @@
 // #include "rplidar.h"
 
 #include "robot.h"
+#include "mapping.h"
+#ifndef DISABLE_MAPPING
+#include "mapvisualizer.h"
+#endif
 #ifndef DISABLE_JOYSTICK
 #include <QJoysticks.h>
 #endif
@@ -69,6 +73,11 @@ private:
   robot _robot;
   //--skuste tu nic nevymazat... pridavajte co chcete, ale pri odoberani by sa
   // mohol stat nejaky drobny problem, co bude vyhadzovat chyby
+  #ifndef DISABLE_MAPPING
+    Mapping* mapper_;
+    MapVisualizer* visualizer_;
+  #endif
+
   Ui::MainWindow *ui;
   void paintEvent(QPaintEvent *event); // Q_DECL_OVERRIDE;
   int updateLaserPicture;
