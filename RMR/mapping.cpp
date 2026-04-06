@@ -2,13 +2,14 @@
 
 Mapping::Mapping(QObject *parent)
     : QObject(parent), 
-      map_width_(6.2), 
+      map_width_(6.02), 
       map_height_(6.81), 
       cell_size_(0.01),
       origin_x_(0.0),
       origin_y_(-1.6),
       robot_start_x_(0.5),  // Starting position in world coordinates (0.5, 0.5)
-      robot_start_y_(0.5)
+      robot_start_y_(0.5),
+      last_scan_pose_{robot_start_x_, robot_start_y_, 0, 0}
 {
 #ifndef DISABLE_MAPPING
     initializeGrid();
@@ -65,7 +66,7 @@ void Mapping::updateMapFromLidar(double robot_x, double robot_y, double robot_ph
         double distance_m = lidar_data[i].scanDistance * 0.001; // Convert to meters
         if (distance_m <= 0.0 || distance_m > 5.0) continue;
 
-        double world_angle = robot_phi + angle_rad; 
+        double world_angle = robot_phi - angle_rad; 
         double world_x = robot_x + distance_m * cos(world_angle);
         double world_y = robot_y + distance_m * sin(world_angle);
         int grid_x, grid_y;
@@ -97,17 +98,17 @@ void Mapping::updateMapFromLidar(double robot_x, double robot_y, double robot_ph
 
 bool Mapping::worldToGrid(double world_x, double world_y, int& grid_x, int& grid_y) const
 {
-    grid_x = static_cast<int>((world_x - origin_x_) / cell_size_);
-    grid_y = static_cast<int>((world_y - origin_y_) / cell_size_);
-    
-    // Bounds checking
-    int width = static_cast<int>(map_width_ / cell_size_);
-    int height = static_cast<int>(map_height_ / cell_size_);
-    
-    if (grid_x < 0 || grid_x >= width || grid_y < 0 || grid_y >= height) {
-        return false; // Out of bounds
-    }
-    return true;
+    const int width = static_cast<int>(map_width_ / cell_size_);
+    const int height = static_cast<int>(map_height_ / cell_size_);
+
+    const int y_shift_rows = 0; // tune this number
+
+    grid_x = static_cast<int>(std::floor((world_x - origin_x_) / cell_size_));
+
+    const int y_cells = static_cast<int>(std::floor((world_y - origin_y_) / cell_size_));
+    grid_y = (height - 1) - y_cells + y_shift_rows; // downward shift only (height - 1) - y_cells + y_shift_rows;
+
+    return (grid_x >= 0 && grid_x < width && grid_y >= 0 && grid_y < height);
 }
 
 uint8_t Mapping::getOccupancy(double world_x, double world_y) const
@@ -139,15 +140,15 @@ void Mapping::onLidarData(const std::vector<LaserData>& lidata)
     );
     
     double rot_delta = fabs(normalizeAngleDiff(current_robot_phi_, last_scan_pose_.phi));
+    bool moving = (pos_delta > POSITION_THRESHOLD || rot_delta > ROTATION_THRESHOLD);
     
-    // Only process if robot is stationary
-    if (pos_delta > POSITION_THRESHOLD || rot_delta > ROTATION_THRESHOLD) {
-        return;  // Robot is moving, skip this scan
-    }
-    
-    // Save this pose as last successful scan
     last_scan_pose_ = {current_robot_x_, current_robot_y_, current_robot_phi_, 0};
     
+    // Only process if robot is stationary
+    if (moving) {
+        return;  // Robot is moving, skip this scan
+    }
+
     locker.unlock();
     updateMapFromLidar(current_robot_x_, current_robot_y_, current_robot_phi_, lidata);
 }
@@ -155,15 +156,19 @@ void Mapping::onLidarData(const std::vector<LaserData>& lidata)
 void Mapping::onRobotPosition(double x, double y, double phi, bool obstacle)
 {
     QMutexLocker locker(&map_mutex_);
-    current_robot_x_ = x;
-    current_robot_y_ = y;
-    current_robot_phi_ = phi;
-    recordPose(x, y, phi);
+    current_robot_x_ = robot_start_x_ + x;
+    current_robot_y_ = robot_start_y_ + y;
+    current_robot_phi_ = phi * M_PI / 180.0; // Convert to radians
+    // recordPose(x, y, phi);
+    recordPose(current_robot_x_, current_robot_y_, current_robot_phi_);
 }
 
 // Helper to normalize angle difference
 double Mapping::normalizeAngleDiff(double phi1, double phi2) const
 {
-    
+    double diff = phi2 - phi1;
+    while (diff > M_PI) diff -= 2 * M_PI;
+    while (diff < -M_PI) diff += 2 * M_PI;
+    return diff;
 }
 #endif
