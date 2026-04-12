@@ -90,7 +90,7 @@ private:
   QJoysticks *instance;
 #endif
 public slots:
-  void setUiValues(double robotX, double robotY, double robotFi, bool obstacle);
+  void setUiValues(double robotX, double robotY, double robotFi, bool obstacle, uint32_t timestamp);
 };
 
 #endif // MAINWINDOW_H

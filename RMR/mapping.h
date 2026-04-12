@@ -7,6 +7,7 @@
 #include <vector>
 #include <memory>
 #include <cmath>
+#include <cstdint>
 #include "librobot/librobot.h"
 
 #ifndef DISABLE_MAPPING
@@ -35,7 +36,7 @@ class Mapping : public QObject {
 #ifndef DISABLE_MAPPING
     public slots:
         void onLidarData(const std::vector<LaserData>& lidata);
-        void onRobotPosition(double x, double y, double phi, bool obstacle);
+        void onRobotPosition(double x, double y, double phi, bool obstacle, uint32_t timestamp);
 #endif
 
     private:
@@ -49,8 +50,13 @@ class Mapping : public QObject {
         double map_width_;     
         double map_height_;     
         double cell_size_;      // 0.01 m
+        double map_height_extend_;
+        double map_width_extend_;
         double robot_start_x_;  // Starting position in world coordinates
         double robot_start_y_;
+
+        double min_lidar_range_ = 0.5;
+        double max_lidar_range_ = 3.0;
         
         struct WorldPoint {
                 double x;
@@ -65,8 +71,8 @@ class Mapping : public QObject {
 #ifndef DISABLE_MAPPING
         cv::Mat occupancy_grid_;  // CV_8U: 0=free, 127=unknown, 255=occupied
         std::deque<RobotPose> pose_history_;  // stores poses for interpolation
-        static constexpr int POSE_HISTORY_SIZE = 4;  // keep 4 poses for cubic interpolation
-        
+        static constexpr int POSE_HISTORY_SIZE = 20; 
+                
         double current_robot_x_ = 0.0;
         double current_robot_y_ = 0.0;
         double current_robot_phi_ = 0.0;
@@ -84,17 +90,25 @@ class Mapping : public QObject {
         // Helper methods
         bool worldToGrid(double world_x, double world_y, int& grid_x, int& grid_y) const;
         void initializeGrid();
-        void recordPose(double x, double y, double phi);
+        void recordPose(double x, double y, double phi, double timestamp);
         double normalizeAngleDiff(double phi1, double phi2) const;
+        double normalizeTimestamp(double timestamp) const;
+        double unwrapRobotTimestamp(double timestamp);
+        double liftLidarTimestamp(double timestamp_mod, double reference_unwrapped) const;
         
         // Cubic Hermite interpolation
-        double cubicInterpolate(double p0, double p1, double p2, double p3, double t) const;
+        // double cubicInterpolate(double p0, double p1, double p2, double p3, double t) const;
         RobotPose interpolatePose(double t) const;
         
         // Constants
         static const uint8_t CELL_FREE = 0;
         static const uint8_t CELL_UNKNOWN = 127;
         static const uint8_t CELL_OCCUPIED = 255;
+
+        static constexpr double TIMESTAMP_MODULO = 3600000000.0;
+        bool has_last_robot_timestamp_ = false;
+        double last_robot_timestamp_mod_ = 0.0;
+        double robot_timestamp_wrap_offset_ = 0.0;
 };
 
 #endif // MAPPING_H

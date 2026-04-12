@@ -6,7 +6,7 @@ MapVisualizer::MapVisualizer(Mapping* mapping, QWidget *parent)
     : QMainWindow(parent), mapping_(mapping)
 {
     setWindowTitle("Map Visualization");
-    setGeometry(100, 100, 800, 900);
+    setGeometry(100, 100, 826, 930);
     
     connect(mapping_, SIGNAL(mapUpdated()), this, SLOT(onMapUpdated()));
 }

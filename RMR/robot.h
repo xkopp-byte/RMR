@@ -19,6 +19,7 @@ Q_DECLARE_METATYPE(cv::Mat)
 Q_DECLARE_METATYPE(skeleton)
 #endif
 Q_DECLARE_METATYPE(std::vector<LaserData>)
+Q_DECLARE_METATYPE(uint32_t)
 class robot : public QObject {
   Q_OBJECT
 public:
@@ -43,7 +44,7 @@ public:
   }
 
 signals:
-  void publishPosition(double x, double y, double z, bool obstacle_detected);
+  void publishPosition(double x, double y, double z, bool obstacle_detected, uint32_t timestamp);
   void publishLidar(const std::vector<LaserData> &lidata);
 #ifndef DISABLE_OPENCV
   void publishCamera(const cv::Mat &camframe);

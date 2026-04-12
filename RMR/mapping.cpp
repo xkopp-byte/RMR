@@ -1,15 +1,18 @@
 #include "mapping.h"
+#include <cstdio>
 
 Mapping::Mapping(QObject *parent)
     : QObject(parent), 
-      map_width_(6.02), 
-      map_height_(6.81), 
-      cell_size_(0.01),
-      origin_x_(0.0),
-      origin_y_(-1.6),
-      robot_start_x_(0.5),  // Starting position in world coordinates (0.5, 0.5)
-      robot_start_y_(0.5),
-      last_scan_pose_{robot_start_x_, robot_start_y_, 0, 0}
+        map_width_(6.02), 
+        map_height_(6.81), 
+        map_height_extend_(1.0),
+        map_width_extend_(1.0),
+        cell_size_(0.01),
+        origin_x_(-0.5), // 0.0
+        origin_y_(-2.1), // -1.6
+        robot_start_x_(0.5),  // Starting position in world coordinates (0.5, 0.5)
+        robot_start_y_(0.5),
+        last_scan_pose_{robot_start_x_, robot_start_y_, 0, 0}
 {
 #ifndef DISABLE_MAPPING
     initializeGrid();
@@ -23,31 +26,57 @@ Mapping::~Mapping()
 #ifndef DISABLE_MAPPING
 void Mapping::initializeGrid()
 {
-    int width = static_cast<int>(map_width_ / cell_size_);    // 602 = 602 - 0
-    int height = static_cast<int>(map_height_ / cell_size_);  // 681 = 521 - (-160)
+    int width = static_cast<int>(map_width_ / cell_size_ + map_width_extend_ / cell_size_);    // 602 = 602 - 0 
+    int height = static_cast<int>(map_height_ / cell_size_ + map_height_extend_ / cell_size_);  // 681 = 521 - (-160)
     // 0, -160 vo svetovych suradniciach je 0, 0 v gride
     // robot zacina na 50, 50 v svetovych suradniciach (podla https://github.com/tom-jurov/test_simulator/blob/65b67dfd964c9a59e13280c229c1e35fae0daecb/mainwindow.h)
     //
-    occupancy_grid_ = cv::Mat(height, width, CV_8U, cv::Scalar(127));  // Unknown (gray)
+    occupancy_grid_ = cv::Mat(height, width, CV_8U, cv::Scalar(0));
 }
 
-void Mapping::recordPose(double x, double y, double phi)
+void Mapping::recordPose(double x, double y, double phi, double timestamp)
 {
-    pose_history_.push_back({x, y, phi, 0.0});
+    const double unwrapped_timestamp = unwrapRobotTimestamp(timestamp);
+    pose_history_.push_back({x, y, phi, unwrapped_timestamp});
     if (pose_history_.size() > POSE_HISTORY_SIZE) {
         pose_history_.pop_front();
     }
 }
 
-// Cubic Hermite interpolation: p(t) = h0*p0 + h1*p1 + h2*m0 + h3*m1
-// where m0, m1 are slopes, and t is in [0,1]
-double Mapping::cubicInterpolate(double p0, double p1, double p2, double p3, double t) const
-{
-    
-}
+// double Mapping::cubicInterpolate(double p0, double p1, double p2, double p3, double t) const
+// {
+//     
+// }
 
 Mapping::RobotPose Mapping::interpolatePose(double t) const
 {
+    if (pose_history_.empty()) return last_scan_pose_;
+    if (pose_history_.size() == 1) return pose_history_.back();
+    if (t <= pose_history_.front().timestamp) return pose_history_.front();
+    if (t >= pose_history_.back().timestamp) return pose_history_.back();
+
+    // Find bracket [p0, p1] with p0.t <= t <= p1.t
+    size_t i = 0;
+    while (i + 1 < pose_history_.size() && pose_history_[i + 1].timestamp < t)
+    {
+        i++;
+    }
+    const RobotPose& p0 = pose_history_[i];
+    const RobotPose& p1 = (i + 1 < pose_history_.size()) ? pose_history_[i + 1] : p0;
+
+    if (p1.timestamp == p0.timestamp) return p0;
+
+    const double alpha = (t - p0.timestamp) / (p1.timestamp - p0.timestamp);
+    const double dphi = normalizeAngleDiff(p0.phi, p1.phi);
+
+    return 
+    {
+        p0.x + alpha * (p1.x - p0.x),
+        p0.y + alpha * (p1.y - p0.y),
+        p0.phi + alpha * dphi,
+        t
+    };
+
     
 }
 
@@ -64,11 +93,15 @@ void Mapping::updateMapFromLidar(double robot_x, double robot_y, double robot_ph
     {
         double angle_rad = lidar_data[i].scanAngle * M_PI / 180.0; // Convert to radians
         double distance_m = lidar_data[i].scanDistance * 0.001; // Convert to meters
-        if (distance_m <= 0.0 || distance_m > 5.0) continue;
+        uint32_t timestamp = lidar_data[i].timestamp;
+        
+        if (distance_m <= min_lidar_range_ || distance_m > max_lidar_range_) continue;
 
-        double world_angle = robot_phi - angle_rad; 
+        (void)timestamp;
+        double world_angle = robot_phi - angle_rad;
         double world_x = robot_x + distance_m * cos(world_angle);
         double world_y = robot_y + distance_m * sin(world_angle);
+        
         int grid_x, grid_y;
         if (worldToGrid(world_x, world_y, grid_x, grid_y)) 
         {
@@ -96,12 +129,66 @@ void Mapping::updateMapFromLidar(double robot_x, double robot_y, double robot_ph
     emit mapUpdated();
 }
 
+double Mapping::normalizeTimestamp(double timestamp) const
+{
+    double mod_ts = std::fmod(timestamp, TIMESTAMP_MODULO);
+    if (mod_ts < 0.0) {
+        mod_ts += TIMESTAMP_MODULO;
+    }
+    return mod_ts;
+}
+
+double Mapping::unwrapRobotTimestamp(double timestamp)
+{
+    const double mod_ts = normalizeTimestamp(timestamp);
+
+    if (!has_last_robot_timestamp_) {
+        has_last_robot_timestamp_ = true;
+        last_robot_timestamp_mod_ = mod_ts;
+        robot_timestamp_wrap_offset_ = 0.0;
+        return mod_ts;
+    }
+
+    // Detect wrap-around at modulo boundary.
+    if (mod_ts < last_robot_timestamp_mod_ &&
+        (last_robot_timestamp_mod_ - mod_ts) > (TIMESTAMP_MODULO * 0.5)) {
+        robot_timestamp_wrap_offset_ += TIMESTAMP_MODULO;
+    }
+
+    last_robot_timestamp_mod_ = mod_ts;
+    return mod_ts + robot_timestamp_wrap_offset_;
+}
+
+double Mapping::liftLidarTimestamp(double timestamp_mod, double reference_unwrapped) const
+{
+    const double base_cycle = std::floor(reference_unwrapped / TIMESTAMP_MODULO);
+    const double c0 = (base_cycle - 1.0) * TIMESTAMP_MODULO + timestamp_mod;
+    const double c1 = base_cycle * TIMESTAMP_MODULO + timestamp_mod;
+    const double c2 = (base_cycle + 1.0) * TIMESTAMP_MODULO + timestamp_mod;
+
+    double best = c1;
+    double best_diff = std::fabs(c1 - reference_unwrapped);
+
+    const double diff0 = std::fabs(c0 - reference_unwrapped);
+    if (diff0 < best_diff) {
+        best = c0;
+        best_diff = diff0;
+    }
+
+    const double diff2 = std::fabs(c2 - reference_unwrapped);
+    if (diff2 < best_diff) {
+        best = c2;
+    }
+
+    return best;
+}
+
 bool Mapping::worldToGrid(double world_x, double world_y, int& grid_x, int& grid_y) const
 {
-    const int width = static_cast<int>(map_width_ / cell_size_);
-    const int height = static_cast<int>(map_height_ / cell_size_);
+    const int width = static_cast<int>(map_width_ / cell_size_ + map_width_extend_ / cell_size_); 
+    const int height = static_cast<int>(map_height_ / cell_size_ + map_height_extend_ / cell_size_);
 
-    const int y_shift_rows = 0; // tune this number
+    const int y_shift_rows = 0;
 
     grid_x = static_cast<int>(std::floor((world_x - origin_x_) / cell_size_));
 
@@ -153,14 +240,24 @@ void Mapping::onLidarData(const std::vector<LaserData>& lidata)
     updateMapFromLidar(current_robot_x_, current_robot_y_, current_robot_phi_, lidata);
 }
 
-void Mapping::onRobotPosition(double x, double y, double phi, bool obstacle)
+void Mapping::onRobotPosition(double x, double y, double phi, bool obstacle, uint32_t timestamp)
 {
     QMutexLocker locker(&map_mutex_);
     current_robot_x_ = robot_start_x_ + x;
     current_robot_y_ = robot_start_y_ + y;
     current_robot_phi_ = phi * M_PI / 180.0; // Convert to radians
-    // recordPose(x, y, phi);
-    recordPose(current_robot_x_, current_robot_y_, current_robot_phi_);
+    recordPose(current_robot_x_, current_robot_y_, current_robot_phi_, timestamp);
+
+    static int pose_rx_counter = 0;
+    pose_rx_counter++;
+    if ((pose_rx_counter % 50) == 0) {
+        std::printf("[MAP] pose rx #%d: x=%.3f y=%.3f phi=%.3f ts=%u\n",
+                    pose_rx_counter,
+                    current_robot_x_,
+                    current_robot_y_,
+                    current_robot_phi_,
+                    timestamp);
+    }
 }
 
 // Helper to normalize angle difference

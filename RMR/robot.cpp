@@ -7,6 +7,7 @@
 robot::robot(QObject *parent) : QObject(parent)
 {
     qRegisterMetaType<LaserMeasurement>("LaserMeasurement");
+    qRegisterMetaType<uint32_t>("uint32_t");
     #ifndef DISABLE_OPENCV
     qRegisterMetaType<cv::Mat>("cv::Mat");
 #endif
@@ -469,7 +470,7 @@ int robot::processThisRobot(const TKobukiData &robotdata)
     cout<<"\n";
     //synctimestamp = robotdata.Timestamp; na zadanie 3 
     ///kazdy piaty krat, aby to ui moc nepreblikavalo..
-    if(datacounter%5==0)
+    // if(datacounter%5==0)
     {
 
         ///ak nastavite hodnoty priamo do prvkov okna,ako je to na tychto zakomentovanych riadkoch tak sa moze stat ze vam program padne
@@ -480,7 +481,8 @@ int robot::processThisRobot(const TKobukiData &robotdata)
         /// okno pocuva vo svojom slote a vasu premennu nastavi tak ako chcete. prikaz emit to presne takto spravi
         /// viac o signal slotoch tu: https://doc.qt.io/qt-5/signalsandslots.html
         ///posielame sem nezmysli.. pohrajte sa nech sem idu zmysluplne veci
-        emit publishPosition(x_position, y_position, gyro_angle/100, obstacle_detected);
+        const uint32_t ts = robotdata.synctimestamp; 
+        emit publishPosition(x_position, y_position, gyro_angle/100, obstacle_detected, ts);
         ///toto neodporucam na nejake komplikovane struktury.signal slot robi kopiu dat. radsej vtedy posielajte
         /// prazdny signal a slot bude vykreslovat strukturu (vtedy ju musite mat samozrejme ako member premmennu v mainwindow.ak u niekoho najdem globalnu premennu,tak bude cistit bludisko zubnou kefkou.. kefku dodam)
         /// vtedy ale odporucam pouzit mutex, aby sa vam nestalo ze budete pocas vypisovania prepisovat niekde inde

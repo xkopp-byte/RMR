@@ -17,7 +17,7 @@ MainWindow::MainWindow(QWidget *parent) :
 {
 
     //tu je napevno nastavena ip. treba zmenit na to co ste si zadali do text boxu alebo nejaku inu pevnu. co bude spravna
-    ipaddress="127.0.0.1";//192.168.1.11toto je na niektory realny robot.. na lokal budete davat "127.0.0.1"
+    ipaddress="127.0.0.1";//192.168.1.15 toto je na niektory realny robot.. na lokal budete davat "127.0.0.1"
 
     ui->setupUi(this);
     datacounter=0;
@@ -103,12 +103,13 @@ void MainWindow::paintEvent(QPaintEvent *event)
 
 /// toto je slot. niekde v kode existuje signal, ktory je prepojeny. pouziva sa napriklad (v tomto pripade) ak chcete dostat data z jedneho vlakna (robot) do ineho (ui)
 /// prepojenie signal slot je vo funkcii  on_pushButton_9_clicked
-void  MainWindow::setUiValues(double robotX,double robotY,double robotFi, bool obstacle)
+void  MainWindow::setUiValues(double robotX,double robotY,double robotFi, bool obstacle, uint32_t timestamp)
 {
     ui->lineEdit_5->setText(QString::number(robotX));
     ui->lineEdit_3->setText(QString::number(robotY));
     ui->lineEdit_4->setText(QString::number(robotFi));
     ui->lineEdit_2->setText(QString::number(obstacle));
+    ui->lineEdit_6->setText(QString::number(timestamp));
 }
 
 
@@ -122,6 +123,7 @@ void MainWindow::on_pushButton_9_clicked() //start button
     #ifndef DISABLE_MAPPING
     cout << "\nCreating mapper and visualizer...\n---------------\n";
     qRegisterMetaType<std::vector<LaserData>>("std::vector<LaserData>");
+    qRegisterMetaType<uint32_t>("uint32_t");
     
 
     // Create mapper and visualizer
@@ -131,14 +133,14 @@ void MainWindow::on_pushButton_9_clicked() //start button
     // Connect robot signals to mapper
     connect(&_robot, SIGNAL(publishLidar(const std::vector<LaserData>&)),
             mapper_, SLOT(onLidarData(const std::vector<LaserData>&)), Qt::QueuedConnection);
-    connect(&_robot, SIGNAL(publishPosition(double, double, double, bool)),
-            mapper_, SLOT(onRobotPosition(double, double, double, bool)), Qt::QueuedConnection);
+    connect(&_robot, SIGNAL(publishPosition(double, double, double, bool, uint32_t)),
+            mapper_, SLOT(onRobotPosition(double, double, double, bool, uint32_t)), Qt::QueuedConnection);
     
     visualizer_->show();
     #endif
 
 
-    connect(&_robot,SIGNAL(publishPosition(double,double,double, bool)),this,SLOT(setUiValues(double,double,double, bool)));
+    connect(&_robot,SIGNAL(publishPosition(double,double,double, bool, uint32_t)),this, SLOT(setUiValues(double,double,double, bool, uint32_t)));
     connect(&_robot,SIGNAL(publishLidar(const std::vector<LaserData> &)),this,SLOT(paintThisLidar(const std::vector<LaserData> &)));
 #ifndef DISABLE_OPENCV
     connect(&_robot,SIGNAL(publishCamera(const cv::Mat &)),this,SLOT(paintThisCamera(const cv::Mat &)));
