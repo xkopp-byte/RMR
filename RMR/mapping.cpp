@@ -5,13 +5,13 @@ Mapping::Mapping(QObject *parent)
     : QObject(parent), 
         map_width_(6.02), 
         map_height_(6.81), 
-        map_height_extend_(1.0),
-        map_width_extend_(1.0),
+        map_height_extend_(6.81),
+        map_width_extend_(6.02),
         cell_size_(0.01),
-        origin_x_(-0.5), // 0.0
-        origin_y_(-2.1), // -1.6
-        robot_start_x_(0.5),  // Starting position in world coordinates (0.5, 0.5)
-        robot_start_y_(0.5),
+        origin_x_(-0.5), // 0.0 // -0.5
+        origin_y_(-2.1), // -1.6 // -2.1
+        robot_start_x_(6.0),  // Starting position in world coordinates (0.5, 0.5)
+        robot_start_y_(6.0),
         last_scan_pose_{robot_start_x_, robot_start_y_, 0, 0}
 {
 #ifndef DISABLE_MAPPING
@@ -87,44 +87,42 @@ void Mapping::updateMapFromLidar(double robot_x, double robot_y, double robot_ph
 
     QMutexLocker locker(&map_mutex_);
 
+     if (pose_history_.empty()) 
+    {
+        return; 
+    }
+
+    // Use the latest robot pose timestamp as our unwrapping reference
+    double reference_unwrapped_ts = pose_history_.back().timestamp;
+
     int num_scans = lidar_data.size();
    
     for (int i = 0; i < num_scans; i++)
     {
         double angle_rad = lidar_data[i].scanAngle * M_PI / 180.0; // Convert to radians
-        double distance_m = lidar_data[i].scanDistance * 0.001; // Convert to meters
-        uint32_t timestamp = lidar_data[i].timestamp;
+        double distance_m = lidar_data[i].scanDistance * 0.001;    // Convert to meters
+        uint32_t raw_lidar_ts = lidar_data[i].timestamp;
         
         if (distance_m <= min_lidar_range_ || distance_m > max_lidar_range_) continue;
 
-        (void)timestamp;
-        double world_angle = robot_phi - angle_rad;
-        double world_x = robot_x + distance_m * cos(world_angle);
-        double world_y = robot_y + distance_m * sin(world_angle);
+        // 1. Lift the wrapping LiDAR timestamp into our continuous timeline
+        double lifted_ts = liftLidarTimestamp(static_cast<double>(raw_lidar_ts), reference_unwrapped_ts);
+
+        // 2. Interpolate the exact robot pose at the moment this laser point was fired
+        RobotPose exact_pose = interpolatePose(lifted_ts);
+
+        // 3. Project the laser point into the world using the interpolated pose
+        double world_angle = exact_pose.phi - angle_rad;
+        double world_x = exact_pose.x + distance_m * cos(world_angle);
+        double world_y = exact_pose.y + distance_m * sin(world_angle);
         
         int grid_x, grid_y;
         if (worldToGrid(world_x, world_y, grid_x, grid_y)) 
         {
-            occupancy_grid_.at<uint8_t>(grid_y, grid_x) = CELL_OCCUPIED;  // TODO: doplnit logiku pre free/unknown
+            occupancy_grid_.at<uint8_t>(grid_y, grid_x) = CELL_OCCUPIED;
         }
     }
 
-//     // debug print
-//     cout << "Updating map with " << lidar_data.size() << " lidar points at robot pose (" 
-//          << robot_x << ", " << robot_y << ", " << robot_phi * 180.0 / M_PI << " deg)\n";
-// 
-// 
-//     for (size_t i = 0; i < static_cast<size_t>(occupancy_grid_.rows ); i++)
-//     {
-//         for (size_t j = 0; j < static_cast<size_t>(occupancy_grid_.cols ); j++)
-//         {
-//             if (occupancy_grid_.at<uint8_t>(i, j) == CELL_OCCUPIED)
-//             {
-//                 cout << "Occupied cell at grid (" << j << ", " << i << ")\n";
-//                 cout << static_cast<int>(occupancy_grid_.at<uint8_t>(i, j)) << " ";
-//             }
-//         }
-//     }
     locker.unlock();
     emit mapUpdated();
 }
@@ -227,8 +225,8 @@ void Mapping::onLidarData(const std::vector<LaserData>& lidata)
     );
     
     double rot_delta = fabs(normalizeAngleDiff(current_robot_phi_, last_scan_pose_.phi));
-    bool moving = (pos_delta > POSITION_THRESHOLD || rot_delta > ROTATION_THRESHOLD);
-    
+    // bool moving = (pos_delta > POSITION_THRESHOLD || rot_delta > ROTATION_THRESHOLD);
+    bool moving = false;
     last_scan_pose_ = {current_robot_x_, current_robot_y_, current_robot_phi_, 0};
     
     // Only process if robot is stationary

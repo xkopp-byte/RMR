@@ -55,8 +55,8 @@ class Mapping : public QObject {
         double robot_start_x_;  // Starting position in world coordinates
         double robot_start_y_;
 
-        double min_lidar_range_ = 0.5;
-        double max_lidar_range_ = 3.0;
+        double min_lidar_range_ = 0.8;
+        double max_lidar_range_ = 2.0;
         
         struct WorldPoint {
                 double x;
@@ -78,8 +78,8 @@ class Mapping : public QObject {
         double current_robot_phi_ = 0.0;
 
         RobotPose last_scan_pose_ = {0, 0, 0, 0};
-        static constexpr double POSITION_THRESHOLD = 0.01;
-        static constexpr double ROTATION_THRESHOLD = 0.01; 
+        static constexpr double POSITION_THRESHOLD = 0.1;
+        static constexpr double ROTATION_THRESHOLD = 0.1; 
 #endif
         double origin_x_;
         double origin_y_;
