@@ -308,16 +308,6 @@ void robot::updateArcTrajectory()
         const double segment_angle_deg = 360.0 / static_cast<double>(segment_count);
         bool use_pi_for_obstacle_turn = false;
         double candidate_error_deg = 0.0;
-        bool has_free_segment = false;
-
-        for (int i = 0; i < segment_count; i++)
-        {
-            if (lidar_segments[i] == 0)
-            {
-                has_free_segment = true;
-                break;
-            }
-        }
 
         if (candidate_idx > 0 && candidate_idx < segment_count)
         {
@@ -326,16 +316,8 @@ void robot::updateArcTrajectory()
             else
                 candidate_error_deg = static_cast<double>(segment_count - candidate_idx) * segment_angle_deg;
 
-            if (fabs(candidate_error_deg) <= 90.0)
-            {
-                rotationspeed = piRegulator(candidate_error_deg);
-                use_pi_for_obstacle_turn = true;
-            }
-            else
-            {
-                use_pi_for_obstacle_turn = false;
-                candidate_error_deg > 90.0 ? rotationspeed = max_rotation_speed/2 : rotationspeed = -max_rotation_speed/2;
-            }
+            rotationspeed = piRegulator(candidate_error_deg);
+
         }
         int front_state = lidar_segments[0];
         if (front_state >= 3)
@@ -346,18 +328,13 @@ void robot::updateArcTrajectory()
             front_state = 2;
 
         double desired_forwardspeed = 0.0;
-        if (use_pi_for_obstacle_turn)
-        {
-            if (front_state == 0)
-                desired_forwardspeed = max_forward_speed;
-            else if (front_state == 1)
-                desired_forwardspeed = max_forward_speed * 0.5;
-            else
-                desired_forwardspeed = 0;
-        }
+        if (front_state == 0)
+            desired_forwardspeed = max_forward_speed;
+        else if (front_state == 1)
+            desired_forwardspeed = max_forward_speed * 0.5;
+        else
+            desired_forwardspeed = max_forward_speed * 0.3;
 
-        if (!has_free_segment)
-            desired_forwardspeed = -20.0;
 
         actual_forwardspeed = applySpeedRamp(actual_forwardspeed, desired_forwardspeed, max_forward_speed,
                                             fwd_scurve_start, fwd_scurve_target,

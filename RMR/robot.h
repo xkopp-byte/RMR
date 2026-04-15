@@ -105,18 +105,18 @@ private:
   double lidar_rotation_remainder = 0.0; // gyro units not yet converted to full segment step
 
   // PI regulator parameters
-  double Kp = 0.01*1.6;           // Proportional gain
+  double Kp = 0.01*1.2;           // Proportional gain
   double Ki = 0.001*1.2;          // Integral gain
   double integral_error = 0; // Accumulated integral error
   double max_integral = 10; // Anti-windup limit
   double max_rotation_speed = 2; // max rotation speed deg/s
   double min_forward_speed = 40;   // minimum forward speed mm/s
   double max_forward_speed = 300;  // maximum forward speed mm/s
-  double target_tolerance = 0.02;  // target reach tolerance sin meters
+  double target_tolerance = 0.05;  // target reach tolerance sin meters
 
   double threshold_mm = 850.0;
   double hysteresis_mm = 500.0;
-  double mi1 = 2.0; //finish_distance
+  double mi1 = 3.0; //finish_distance
   double mi2 = 2.0; //rotate_to_candidate_distance
   double mi3 = 1.0; //candidate_change_distance
 
