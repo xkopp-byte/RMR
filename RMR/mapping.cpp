@@ -196,15 +196,15 @@ bool Mapping::worldToGrid(double world_x, double world_y, int& grid_x, int& grid
     return (grid_x >= 0 && grid_x < width && grid_y >= 0 && grid_y < height);
 }
 
-uint8_t Mapping::getOccupancy(double world_x, double world_y) const
-{
-    
-}
-
-bool Mapping::isObstacle(double world_x, double world_y) const
-{
-    
-}
+// uint8_t Mapping::getOccupancy(double world_x, double world_y) const
+// {
+//     
+// }
+// 
+// bool Mapping::isObstacle(double world_x, double world_y) const
+// {
+//     
+// }
 
 cv::Mat Mapping::getGridImage()
 {
@@ -266,4 +266,24 @@ double Mapping::normalizeAngleDiff(double phi1, double phi2) const
     while (diff < -M_PI) diff += 2 * M_PI;
     return diff;
 }
+
+bool Mapping::saveMapToFile(const std::string& filename) const
+{
+    QMutexLocker locker(&map_mutex_);
+    cv::FileStorage fs(filename, cv::FileStorage::WRITE);
+    if (!fs.isOpened()) return false;
+    
+    fs << "occupancy_grid" << occupancy_grid_;
+    fs << "width" << occupancy_grid_.cols;
+    fs << "height" << occupancy_grid_.rows;
+    fs.release();
+    return true;
+}   
+
+// void Mapping::getOcupancyGrid(cv::Mat& grid) const
+// {
+//     QMutexLocker locker(&map_mutex_);
+//     occupancy_grid_.copyTo(grid);
+// }
+
 #endif

@@ -116,7 +116,7 @@ private:
 
   double threshold_mm = 850.0;
   double hysteresis_mm = 500.0;
-  double mi1 = 3.0; //finish_distance
+  double mi1 = 2.0; //finish_distance
   double mi2 = 2.0; //rotate_to_candidate_distance
   double mi3 = 1.0; //candidate_change_distance
 

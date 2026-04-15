@@ -62,6 +62,8 @@ private slots:
 
   void on_pushButton_clicked();
 
+  void on_pushButton_10_clicked();
+
   int paintThisLidar(const std::vector<LaserData> &laserData);
 #ifndef DISABLE_OPENCV
   int paintThisCamera(const cv::Mat &cameraData);

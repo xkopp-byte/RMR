@@ -2,6 +2,8 @@
 #include "ui_mainwindow.h"
 #include <QPainter>
 #include <math.h>
+#include <QApplication>
+#include <QDir>
 ///TOTO JE DEMO PROGRAM...AK SI HO NASIEL NA PC V LABAKU NEPREPISUJ NIC,ALE SKOPIRUJ SI MA NIEKAM DO INEHO FOLDERA
 /// AK HO MAS Z GITU A ROBIS NA LABAKOVOM PC, TAK SI HO VLOZ DO FOLDERA KTORY JE JASNE ODLISITELNY OD TVOJICH KOLEGOV
 /// NASLEDNE V POLOZKE Projects SKONTROLUJ CI JE VYPNUTY shadow build...
@@ -207,8 +209,22 @@ void MainWindow::on_Set_XY_button_clicked()
     _robot.setTargetXY(x_target, y_target);  // or similar method
   }
 
-
-
+void MainWindow::on_pushButton_10_clicked()
+{
+    if (!mapper_) {
+        std::cout << "Mapper not initialized. Click start button first.\n";
+        return;
+    }
+    
+    // Get the directory of the executable and construct path relative to it
+    QString exePath = QApplication::applicationDirPath();
+    QString filepath = QDir(exePath).filePath("../../../RMR/occupancy_grid.yaml");
+    
+    if (mapper_->saveMapToFile(filepath.toStdString()))
+        std::cout << "Map saved successfully to " << filepath.toStdString() << "\n";
+    else
+        std::cout << "Failed to save map.\n";
+}
 
 void MainWindow::on_pushButton_clicked()
 {

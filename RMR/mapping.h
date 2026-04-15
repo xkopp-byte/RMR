@@ -28,6 +28,8 @@ class Mapping : public QObject {
         uint8_t getOccupancy(double world_x, double world_y) const;
         bool isObstacle(double world_x, double world_y) const;
         cv::Mat getGridImage();
+        // void getOcupancyGrid(cv::Mat& grid) const;
+        bool saveMapToFile(const std::string& filename) const;
 #endif
         
     signals:
@@ -96,6 +98,9 @@ class Mapping : public QObject {
         double unwrapRobotTimestamp(double timestamp);
         double liftLidarTimestamp(double timestamp_mod, double reference_unwrapped) const;
         
+        
+        
+
         // Cubic Hermite interpolation
         // double cubicInterpolate(double p0, double p1, double p2, double p3, double t) const;
         RobotPose interpolatePose(double t) const;
