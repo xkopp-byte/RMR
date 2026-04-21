@@ -1,4 +1,5 @@
 #include "robot.h"
+#include "floodfill.h"
 #include <algorithm>
 #include <cmath>
 #include <limits>
@@ -18,6 +19,8 @@ qRegisterMetaType<skeleton>("skeleton");
 
 void robot::initAndStartRobot(std::string ipaddress)
 {
+    // Run the floodfill navigation initialization once at startup
+    run_floodfill("maps/finalMap.txt", x_target_position, y_target_position, &num_targets);
 
     forwardspeed=0;
     rotationspeed=0;

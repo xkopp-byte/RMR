@@ -83,8 +83,9 @@ private:
   double y_position = 0;
   // float x_target_position[6] = {0.0, 0.4, 0.4, 0.0, 0.0, 1};
   // float y_target_position[6] = {0.4, 0.4, 0.0, 0.0, 0.4, 0.0};
-  float x_target_position[1] = {0};
-  float y_target_position[1] = {0};
+  float x_target_position[50] = {0}; 
+  float y_target_position[50] = {0};
+  int num_targets = 0;
   bool last_target_reached = false;
   bool is_in_vicinity_of_target = false;
 
