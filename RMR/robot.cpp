@@ -42,13 +42,13 @@ void robot::initAndStartRobot(std::string ipaddress)
 
 void robot::setTargetXY(double x_target, double y_target)
 {
-    x_target_position[0] = x_target;
-    y_target_position[0] = y_target;
-    last_target_reached = false; // reset target reached flag for new target
-    current_target_index = 0; // reset to first target index
-    cout << "New target set: (" << x_target << ", " << y_target << ")\n";
+    last_target_reached = false;
+    current_target_index = 0;
+    int map_x = std::round(x_target * (MAP_WIDTH / 5.21) + 210);
+    int y_from_bottom = std::round(y_target * (MAP_HEIGHT / 6.02) + 50);
+    int map_y = (MAP_HEIGHT - 1) - y_from_bottom;
 
-    // run_floodfill("maps/finalMap.txt", x_target_position, y_target_position, &num_targets);
+    run_floodfill("maps/finalMap.txt", map_x, map_y, x_target_position, y_target_position, &num_targets);
 }
 
 void robot::setSpeedVal(double forw, double rots)

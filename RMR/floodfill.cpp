@@ -3,8 +3,8 @@
 #include <stdlib.h>
 #include <string.h>
 
-int Xstart = 0;
-int Ystart = 0;
+int Xstart = 210;
+int Ystart = 50;
 int Xfinal = 0;
 int Yfinal = 0;
 
@@ -37,7 +37,30 @@ static int is_queue_empty() {
     return head == tail;
 }
 
+static void restore_map() {
+    FILE* src = fopen("maps/finalMap_copy.txt", "r");
+    if (!src) {
+        printf("Error: Could not open source map file maps/finalMap_copy.txt\n");
+        return;
+    }
+    FILE* dest = fopen("maps/finalMap.txt", "w");
+    if (!dest) {
+        printf("Error: Could not open destination map file maps/finalMap.txt\n");
+        fclose(src);
+        return;
+    }
+    int ch;
+    while ((ch = fgetc(src)) != EOF) {
+        fputc(ch, dest);
+    }
+    fclose(src);
+    fclose(dest);
+}
+
 static int do_floodfill(const char* map_filename) {
+    
+    restore_map();
+
     FILE* file = fopen(map_filename, "r");
     if (!file) {
         printf("Error: Could not open map file %s\n", map_filename);
@@ -106,6 +129,18 @@ static int do_floodfill(const char* map_filename) {
     return 1;
 }
 
+static float get_global_x(int map_x) {
+    // X length is 521cm (5.21m), Xstart is 210
+    return (map_x - 210) * (5.21f / MAP_WIDTH);
+}
+
+static float get_global_y(int map_y) {
+    // Y length is 602cm (6.02m), Ystart is 50 from bottom left
+    // If map_y=0 is the top of the array, the distance from bottom is:
+    int y_from_bottom = (MAP_HEIGHT - 1) - map_y;
+    return (y_from_bottom - 50) * (6.02f / MAP_HEIGHT);
+}
+
 static void find_path(float* x_target_position, float* y_target_position, int* num_targets, int max_targets) {
     *num_targets = 0;
     if (floodData[Ystart][Xstart] == -1) {
@@ -147,8 +182,8 @@ static void find_path(float* x_target_position, float* y_target_position, int* n
         }
         
         if ((last_dx != 0 || last_dy != 0) && (last_dx != next_dx || last_dy != next_dy)) {
-            x_target_position[*num_targets] = (float)current_x;
-            y_target_position[*num_targets] = (float)current_y;
+            x_target_position[*num_targets] = get_global_x(current_x);
+            y_target_position[*num_targets] = get_global_y(current_y);
             (*num_targets)++;
         }
         
@@ -159,21 +194,23 @@ static void find_path(float* x_target_position, float* y_target_position, int* n
     }
     
     if (*num_targets < max_targets) {
-        x_target_position[*num_targets] = (float)Xfinal;
-        y_target_position[*num_targets] = (float)Yfinal;
+        x_target_position[*num_targets] = get_global_x(Xfinal);
+        y_target_position[*num_targets] = get_global_y(Yfinal);
         (*num_targets)++;
     }
 
     for (int i = *num_targets; i < max_targets; i++) {
-        x_target_position[i] = (float)Xfinal;
-        y_target_position[i] = (float)Yfinal;
+        x_target_position[i] = get_global_x(Xfinal);
+        y_target_position[i] = get_global_y(Yfinal);
     }
 }
 
-int run_floodfill(const char* map_filename, float* x_target_position, float* y_target_position, int* num_targets) {
+int run_floodfill(const char* map_filename, int x_final, int y_final, float* x_target_position, float* y_target_position, int* num_targets) {
+    Xfinal = x_final;
+    Yfinal = y_final;
+    
     if (do_floodfill(map_filename)) {
-        // Assuming 500 is the size defined in robot.h
-        find_path(x_target_position, y_target_position, num_targets, 500);
+        find_path(x_target_position, y_target_position, num_targets, 50);
         return 1;
     }
     *num_targets = 0;
