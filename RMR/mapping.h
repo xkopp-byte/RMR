@@ -81,7 +81,7 @@ class Mapping : public QObject {
 
         RobotPose last_scan_pose_ = {0, 0, 0, 0};
         static constexpr double POSITION_THRESHOLD = 0.01;
-        static constexpr double ROTATION_THRESHOLD = 0.001; 
+        static constexpr double ROTATION_THRESHOLD = 0.1; 
 #endif
         double origin_x_;
         double origin_y_;

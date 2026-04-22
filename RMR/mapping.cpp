@@ -225,7 +225,8 @@ void Mapping::onLidarData(const std::vector<LaserData>& lidata)
     );
     
     double rot_delta = fabs(normalizeAngleDiff(current_robot_phi_, last_scan_pose_.phi));
-    bool moving = (pos_delta > POSITION_THRESHOLD || rot_delta > ROTATION_THRESHOLD);
+    // bool moving = (pos_delta > POSITION_THRESHOLD || rot_delta > ROTATION_THRESHOLD);
+    bool moving = (rot_delta > ROTATION_THRESHOLD);
     // bool moving = false;
     last_scan_pose_ = {current_robot_x_, current_robot_y_, current_robot_phi_, 0};
     

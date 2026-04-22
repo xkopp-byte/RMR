@@ -20,7 +20,7 @@ qRegisterMetaType<skeleton>("skeleton");
 void robot::initAndStartRobot(std::string ipaddress)
 {
     // Run the floodfill navigation initialization once at startup
-    run_floodfill("maps/finalMap.txt", x_target_position, y_target_position, &num_targets);
+    // run_floodfill("maps/finalMap.txt", x_target_position, y_target_position, &num_targets);
 
     forwardspeed=0;
     rotationspeed=0;
@@ -38,6 +38,17 @@ void robot::initAndStartRobot(std::string ipaddress)
     robotCom.robotStart();
 
 
+}
+
+void robot::setTargetXY(double x_target, double y_target)
+{
+    x_target_position[0] = x_target;
+    y_target_position[0] = y_target;
+    last_target_reached = false; // reset target reached flag for new target
+    current_target_index = 0; // reset to first target index
+    cout << "New target set: (" << x_target << ", " << y_target << ")\n";
+
+    // run_floodfill("maps/finalMap.txt", x_target_position, y_target_position, &num_targets);
 }
 
 void robot::setSpeedVal(double forw, double rots)

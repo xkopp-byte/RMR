@@ -34,14 +34,7 @@ public:
   // tato funkcia fyzicky posiela hodnoty do robota
   void setSpeed(double forw, double rots);
 
-  void setTargetXY(double x_target, double y_target)
-  {
-    x_target_position[0] = x_target;
-    y_target_position[0] = y_target;
-    last_target_reached = false; // reset target reached flag for new target
-    current_target_index = 0; // reset to first target index
-    cout << "New target set: (" << x_target << ", " << y_target << ")\n";
-  }
+  void setTargetXY(double x_target, double y_target);
 
 signals:
   void publishPosition(double x, double y, double z, bool obstacle_detected, uint32_t timestamp);

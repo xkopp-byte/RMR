@@ -4,6 +4,7 @@ set(SOURCES
     robot.cpp
     mapping.cpp
     mapvisualizer.cpp
+    floodfill.cpp
 )
 
 set(HEADERS
@@ -11,6 +12,7 @@ set(HEADERS
     robot.h
     mapping.h
     mapvisualizer.h
+    floodfill.h
 )
 
 if(NOT DISABLE_JOYSTICK)

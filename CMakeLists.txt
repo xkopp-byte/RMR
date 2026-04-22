@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.16)
-project(RMR VERSION 1.0 LANGUAGES CXX)
+project(RMR VERSION 1.0 LANGUAGES C CXX)
 
 option(DISABLE_OPENCV "Disable OpenCV support" OFF)
 option(DISABLE_SKELETON "Disable skeleton module" OFF)
