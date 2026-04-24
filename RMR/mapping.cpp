@@ -249,14 +249,14 @@ void Mapping::onRobotPosition(double x, double y, double phi, bool obstacle, uin
 
     static int pose_rx_counter = 0;
     pose_rx_counter++;
-    if ((pose_rx_counter % 50) == 0) {
-        std::printf("[MAP] pose rx #%d: x=%.3f y=%.3f phi=%.3f ts=%u\n",
-                    pose_rx_counter,
-                    current_robot_x_,
-                    current_robot_y_,
-                    current_robot_phi_,
-                    timestamp);
-    }
+    // if ((pose_rx_counter % 50) == 0) {
+    //     std::printf("[MAP] pose rx #%d: x=%.3f y=%.3f phi=%.3f ts=%u\n",
+    //                 pose_rx_counter,
+    //                 current_robot_x_,
+    //                 current_robot_y_,
+    //                 current_robot_phi_,
+    //                 timestamp);
+    // }
 }
 
 double Mapping::normalizeAngleDiff(double phi1, double phi2) const

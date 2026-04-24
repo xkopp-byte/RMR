@@ -207,7 +207,8 @@ void MainWindow::on_Set_XY_button_clicked()
     double y_target = ui->set_Y_target->value();
     
     // Send to robot (you need to check what method the robot class provides)
-    _robot.setTargetXY(x_target, y_target);  // or similar method
+    std::cout << "Mainwindow: Setting target XY to (" << x_target << ", " << y_target << ")" << std::endl;
+    _robot.setTargetXY(x_target, y_target); 
   }
 
 void MainWindow::on_pushButton_10_clicked()

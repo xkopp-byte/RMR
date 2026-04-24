@@ -55,3 +55,6 @@ endif()
 if(WIN32)
     target_link_libraries(${PROJECT_NAME} PRIVATE ws2_32 Winmm)
 endif()
+
+file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/maps 
+     DESTINATION ${CMAKE_CURRENT_BINARY_DIR})

@@ -70,7 +70,7 @@ static int do_floodfill(const char* map_filename) {
     for (int y = 0; y < MAP_HEIGHT; y++) {
         for (int x = 0; x < MAP_WIDTH; x++) {
             int ch = fgetc(file);
-            while (ch == '\n' || ch == '\r') {
+            while (ch == '\n' || ch == '\r' || ch == ' ') {
                 ch = fgetc(file); 
             }
             if (ch == EOF) break;
@@ -203,6 +203,8 @@ static void find_path(float* x_target_position, float* y_target_position, int* n
         x_target_position[i] = get_global_x(Xfinal);
         y_target_position[i] = get_global_y(Yfinal);
     }
+    printf("Path updated with %d target points.\n", *num_targets);
+    // cout << "Path updated with " << *num_targets << " target points.\n";
 }
 
 int run_floodfill(const char* map_filename, int x_final, int y_final, float* x_target_position, float* y_target_position, int* num_targets) {

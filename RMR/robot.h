@@ -3,6 +3,7 @@
 #include "librobot/librobot.h"
 #include <QObject>
 #include <QWidget>
+#include <mutex>
 
 #ifndef DISABLE_OPENCV
 #include "opencv2/core/utility.hpp"
@@ -12,6 +13,7 @@
 #include "opencv2/videoio.hpp"
 #include <opencv2/core/core.hpp>
 #include <opencv2/highgui/highgui.hpp>
+
 
 Q_DECLARE_METATYPE(cv::Mat)
 #endif
@@ -57,6 +59,7 @@ private:
   double forwardspeed;  // mm/s
   double rotationspeed; // omega/s
 
+  std::mutex target_mutex;
 
 // // nase privat premenne ˇˇˇˇˇˇˇˇˇˇˇˇˇˇ
   double enc_left = 0;  /// rozsah IRC 0~65535 (2 byte) - TREBA OSETRIT PRETECIENIE

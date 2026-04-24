@@ -42,13 +42,40 @@ void robot::initAndStartRobot(std::string ipaddress)
 
 void robot::setTargetXY(double x_target, double y_target)
 {
-    last_target_reached = false;
-    current_target_index = 0;
+    std::cout << "New target set: (" << x_target << ", " << y_target << ")" << std::endl;
+
+    // x_target_position[0] = x_target;
+    // y_target_position[0] = y_target;
+    // num_targets = 1;
+
     int map_x = std::round(x_target * (MAP_WIDTH / 5.21) + 210);
     int y_from_bottom = std::round(y_target * (MAP_HEIGHT / 6.02) + 50);
     int map_y = (MAP_HEIGHT - 1) - y_from_bottom;
 
-    run_floodfill("maps/finalMap.txt", map_x, map_y, x_target_position, y_target_position, &num_targets);
+    // 1. Calculate path into temporary variables first
+    float temp_x[50] = {0}; // Ensure this matches your array's size from robot.h
+    float temp_y[50] = {0};
+    int temp_num = 0;
+
+    run_floodfill("maps/finalMap.txt", map_x, map_y, temp_x, temp_y, &temp_num);
+    
+    {
+        std::lock_guard<std::mutex> lock(target_mutex);
+
+        last_target_reached = false;
+        current_target_index = 0;
+        num_targets = temp_num;
+        
+        for (int i = 0; i < num_targets; i++) 
+        {
+            x_target_position[i] = temp_x[i];
+            y_target_position[i] = temp_y[i];
+            std::cout << "Target " << i << ": (" << x_target_position[i] << ", " << y_target_position[i] << ")" << std::endl;
+        }
+    }
+
+    
+    
 }
 
 void robot::setSpeedVal(double forw, double rots)
@@ -99,7 +126,7 @@ double robot::piRegulator(double error)
     double output = p_term + i_term;
     if (output > max_rotation_speed) output = max_rotation_speed;
     if (output < -max_rotation_speed) output = -max_rotation_speed;
-    cout<<"PI Regulator - Error: "<<error<<" deg, P: "<<p_term<<" I: "<<i_term<<" Output: "<<output<<" deg/s\n";
+    // cout<<"PI Regulator - Error: "<<error<<" deg, P: "<<p_term<<" I: "<<i_term<<" Output: "<<output<<" deg/s\n";
     return output;
 }
 
@@ -129,10 +156,10 @@ void robot::updateOdometry(const TKobukiData &robotdata)
     rotateLidarSegmentsBySteps(segment_steps);
     lidar_rotation_remainder -= static_cast<double>(segment_steps) * segment_gyro_units;
     //cout << "\ngyro_delta=" << delta_gyro_units << " steps=" << segment_steps << " " << "\n";
-        for (int i = 0; i < 80; i++)
-    {
-        cout << lidar_segments[i];
-    }
+    //     for (int i = 0; i < 80; i++)
+    // {
+    //     // cout << lidar_segments[i];
+    // }
     double delta_enc_left = enc_left - enc_left_prev;
     double delta_enc_right = enc_right - enc_right_prev;
     if (delta_enc_left > 32767) delta_enc_left -= 65536;
@@ -184,7 +211,7 @@ double robot::applySpeedRamp(double current, double target, double max_speed,
     // 6t^5 - 15t^4 + 10t^3
     double s_factor = t * t * t * (t * (t * 6.0 - 15.0) + 10.0);
     double new_speed = ramp_start + (ramp_target - ramp_start) * s_factor;
-    cout<<"Speed Ramp - Step: "<<ramp_step<<"/"<<ramp_total_steps<<", Target: "<<target<<" Current: "<<current<<" New Speed: "<<new_speed<<"\n"<<"S factor: "<<s_factor<<"\n";
+    // cout<<"Speed Ramp - Step: "<<ramp_step<<"/"<<ramp_total_steps<<", Target: "<<target<<" Current: "<<current<<" New Speed: "<<new_speed<<"\n"<<"S factor: "<<s_factor<<"\n";
     if (ramp_step >= ramp_total_steps)
     {
         ramp_active = false;
@@ -262,15 +289,15 @@ int robot::candidateDirection()
             best_candidate = c;
         }
         
-        cout << "Candidate: " << c
-             << ", FinishDistance: " << finish_distance
-             << ", RotateDistance: " << rotate_distance
-             << ", ChangeDistance: " << change_distance
-             << ", Fitness: " << fitness << "\n";
+        // cout << "Candidate: " << c
+        //      << ", FinishDistance: " << finish_distance
+        //      << ", RotateDistance: " << rotate_distance
+        //      << ", ChangeDistance: " << change_distance
+        //      << ", Fitness: " << fitness << "\n";
     }
     
     last_candidate = best_candidate;
-    cout << "Chosen Candidate: " << best_candidate << "\n";
+    // cout << "Chosen Candidate: " << best_candidate << "\n";
     return best_candidate;
 }
 
@@ -297,7 +324,8 @@ void robot::updateArcTrajectory()
         is_in_vicinity_of_target = false; // reset proximity flag for new target
         flag = false; 
         
-        if(current_target_index >= sizeof(x_target_position)/sizeof(x_target_position[0]))
+        // if(current_target_index >= sizeof(x_target_position)/sizeof(x_target_position[0]))
+        if(current_target_index >= num_targets || num_targets == 0)
         {
             last_target_reached = true;
             current_target_index = 0;
@@ -315,7 +343,7 @@ void robot::updateArcTrajectory()
 
     if(obstacle_detected)
     {
-        cout << "\nObstacle detected: " << obstacle_detected << "\n";
+        // cout << "\nObstacle detected: " << obstacle_detected << "\n";
 
         const int candidate_idx = candidateDirection();
         const int segment_count = static_cast<int>(sizeof(lidar_segments) / sizeof(lidar_segments[0]));
@@ -359,17 +387,17 @@ void robot::updateArcTrajectory()
         forwardspeed = actual_forwardspeed;
         setSpeed(forwardspeed, rotationspeed);
 
-        cout << "Obstacle mode - Candidate: " << candidate_idx
-               << ", Candidate Error: " << candidate_error_deg
-             << ", FrontState: " << front_state
-             << ", Forward Speed: " << forwardspeed
-             << ", Rotation Speed: " << rotationspeed << "\n";
+        // cout << "Obstacle mode - Candidate: " << candidate_idx
+        //        << ", Candidate Error: " << candidate_error_deg
+        //      << ", FrontState: " << front_state
+        //      << ", Forward Speed: " << forwardspeed
+        //      << ", Rotation Speed: " << rotationspeed << "\n";
 
              
     } 
     else
     {
-        cout << "\nObstacle detected: " << obstacle_detected << "\n";
+        // cout << "\nObstacle detected: " << obstacle_detected << "\n";
         double error_degrees = 0.0;
         double desired_forwardspeed = 0.0;
 
@@ -435,8 +463,8 @@ void robot::updateArcTrajectory()
 
         setSpeed(forwardspeed, rotationspeed);
 
-        cout<<"Position: ("<<x_position<<", "<<y_position<<"), Target: ("<<x_target<<", "<<y_target<<"), Distance to Target: "<<distance_to_target<<" m, Heading Error: "<<error_degrees<<" deg, Forward Speed: "<<forwardspeed<<" mm/s, Rotation Speed: "<<rotationspeed<<" deg/s, Obstacle: "<<obstacle_detected<<"\n";
-        cout<<"\n ----- Distance to target: " <<distance_to_target<<" Actual speed: "<<actual_forwardspeed<<" mm/s, Desired forward speed: "<<desired_forwardspeed<<" mm/s, In Vicinity: "<<is_in_vicinity_of_target<<"\n\n";
+        // cout<<"Position: ("<<x_position<<", "<<y_position<<"), Target: ("<<x_target<<", "<<y_target<<"), Distance to Target: "<<distance_to_target<<" m, Heading Error: "<<error_degrees<<" deg, Forward Speed: "<<forwardspeed<<" mm/s, Rotation Speed: "<<rotationspeed<<" deg/s, Obstacle: "<<obstacle_detected<<"\n";
+        // cout<<"\n ----- Distance to target: " <<distance_to_target<<" Actual speed: "<<actual_forwardspeed<<" mm/s, Desired forward speed: "<<desired_forwardspeed<<" mm/s, In Vicinity: "<<is_in_vicinity_of_target<<"\n\n";
 
     }
 }
@@ -448,17 +476,20 @@ void robot::updateArcTrajectory()
 int robot::processThisRobot(const TKobukiData &robotdata)
 {   
     updateOdometry(robotdata);
-    if(last_target_reached == false)
     {
-        updateArcTrajectory();
+        std::lock_guard<std::mutex> lock(target_mutex);
+        if(last_target_reached == false)
+        {
+            updateArcTrajectory();
+        }
+        else
+        {
+            forwardspeed = 0;
+            rotationspeed = 0;
+            setSpeed(forwardspeed, rotationspeed);
+        }
     }
-    else
-    {
-        forwardspeed = 0;
-        rotationspeed = 0;
-        setSpeed(forwardspeed, rotationspeed);
-    }
-    cout<<"\n";
+    // cout<<"\n";
     //synctimestamp = robotdata.Timestamp; na zadanie 3 
     ///kazdy piaty krat, aby to ui moc nepreblikavalo..
     // if(datacounter%5==0)
