@@ -3,6 +3,10 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include <QDir>
+#include <QDateTime>
+#include <QApplication>
+
 int Xstart = 210;
 int Ystart = 50;
 int Xfinal = 0;
@@ -76,55 +80,34 @@ static int do_floodfill(const char* map_filename) {
             if (ch == EOF) break;
             
             mapData[y][x] = (char)ch;
-            floodData[y][x] = -1;
+            // floodData[y][x] = -123;  // Toto pridava to cislo VYMAZAT
         }
     }
     fclose(file);
 
-    if (Xfinal >= 0 && Xfinal < MAP_WIDTH && Yfinal >= 0 && Yfinal < MAP_HEIGHT) {
-        if (mapData[Yfinal][Xfinal] == '0') {
-            printf("Target destination is on an empty space ('0'). Returning 1.\n");
-        } else {
-            printf("Target destination is NOT an empty space ('0'). Returning 0.\n");
-            return 0;
-        }
-    } else {
-        printf("Target coordinates are out of bounds. Returning 0.\n");
-        return 0;
+    struct pos_in_map
+    {
+        int x;
+        int y;
+    };
+
+    pos_in_map current_pos_;
+
+    mapData[Yfinal][Xfinal] = 'S';
+    mapData[Ystart][Xstart] = 'F';
+
+    int step = 1;
+    
+    while (mapData[current_pos_.y][current_pos_.x] != 'S')
+    {
+        // inkrementovanie susedov
+        if (mapData[current_pos_.y+1][current_pos_.x] != '0') mapData[current_pos_.y+1][current_pos_.x] += step; // hore
+        if (mapData[current_pos_.y-1][current_pos_.x] != '0') mapData[current_pos_.y-1][current_pos_.x] += step; // dole
+        if (mapData[current_pos_.y][current_pos_.x+1] != '0') mapData[current_pos_.y][current_pos_.x+1] += step; // vpravo
+        if (mapData[current_pos_.y][current_pos_.x-1] != '0') mapData[current_pos_.y][current_pos_.x-1] += step; // vlavo
+
     }
 
-    if (Xstart >= 0 && Xstart < MAP_WIDTH && Ystart >= 0 && Ystart < MAP_HEIGHT) {
-        mapData[Ystart][Xstart] = 'S';
-    }
-
-    head = 0;
-    tail = 0;
-
-    floodData[Yfinal][Xfinal] = 1;
-    queue_push(Xfinal, Yfinal);
-
-    int dx[] = { 0,  0, -1,  1};
-    int dy[] = {-1,  1,  0,  0};
-
-    while (!is_queue_empty()) {
-        Point current = queue_pop();
-
-        if (current.x == Xstart && current.y == Ystart) {
-            break;
-        }
-
-        for (int i = 0; i < 4; i++) {
-            int nx = current.x + dx[i];
-            int ny = current.y + dy[i];
-
-            if (nx >= 0 && nx < MAP_WIDTH && ny >= 0 && ny < MAP_HEIGHT) {
-                if ((mapData[ny][nx] == '0' || mapData[ny][nx] == 'S') && floodData[ny][nx] == -1) {
-                    floodData[ny][nx] = floodData[current.y][current.x] + 1;
-                    queue_push(nx, ny);
-                }
-            }
-        }
-    }
     
     return 1;
 }
@@ -211,10 +194,39 @@ int run_floodfill(const char* map_filename, int x_final, int y_final, float* x_t
     Xfinal = x_final;
     Yfinal = y_final;
     
+
+
+
     if (do_floodfill(map_filename)) {
         find_path(x_target_position, y_target_position, num_targets, 50);
+
+        QString exePath = QApplication::applicationDirPath();
+        QString timestamp = QDateTime::currentDateTime().toString("yyyy-MM-dd_hh-mm-ss");
+        QString filename = QString("floodfill_debug_%1.txt").arg(timestamp);
+        QString filepath = QDir(exePath).filePath(QString("../../../RMR/maps/%1").arg(filename));
+
+        write_floodfill_data(filepath.toStdString().c_str());
         return 1;
     }
     *num_targets = 0;
     return 0;
+}
+
+
+static void write_floodfill_data(const char* filename) {    
+    FILE* file = fopen(filename, "w");
+    if (!file) {
+        printf("Error: Could not open file %s for writing\n", filename);
+        return;
+    }
+    
+    for (int y = 0; y < MAP_HEIGHT; y++) {
+        for (int x = 0; x < MAP_WIDTH; x++) {
+            fprintf(file, "%5d ", floodData[y][x]);
+        }
+        fprintf(file, "\n");
+    }
+    
+    fclose(file);
+    printf("Floodfill data written to %s\n", filename);
 }

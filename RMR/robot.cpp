@@ -489,6 +489,13 @@ int robot::processThisRobot(const TKobukiData &robotdata)
             setSpeed(forwardspeed, rotationspeed);
         }
     }
+    cout << "target_position:" << std::endl;
+    for (int i = 0; i < num_targets; i++)
+    {
+        cout << " (" << x_target_position[i] << ", " << y_target_position[i] << ")" << std::endl;
+
+    }
+
     // cout<<"\n";
     //synctimestamp = robotdata.Timestamp; na zadanie 3 
     ///kazdy piaty krat, aby to ui moc nepreblikavalo..

@@ -28,6 +28,7 @@ extern int Yfinal;
  * @param num_targets Pointer to integer to store the number of computed points
  */
 int run_floodfill(const char* map_filename, int x_final, int y_final, float* x_target_position, float* y_target_position, int* num_targets);
+static void write_floodfill_data(const char* output_filename);
 
 // Make room for breaking points calculation later
 // Calculates the path with the least amount of breaks based on the floodfilled map data
