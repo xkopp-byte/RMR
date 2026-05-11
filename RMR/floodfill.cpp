@@ -1,44 +1,31 @@
 #include "floodfill.h"
+#include <iostream>
+#include <vector>
+#include <queue>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
-#include <QDir>
-#include <QDateTime>
-#include <QApplication>
+using namespace std;
 
-int Xstart = 210;
-int Ystart = 50;
+int Ystart = 210;
+// int Ystart = 470;
+int Xstart = 50;
 int Xfinal = 0;
 int Yfinal = 0;
 
 static char mapData[MAP_HEIGHT][MAP_WIDTH];
 static int  floodData[MAP_HEIGHT][MAP_WIDTH]; 
 
-typedef struct {
-    int x;
-    int y;
-} Point;
+static float get_global_x(int map_x);
+static float get_global_y(int map_y);
 
-static Point queue[MAP_WIDTH * MAP_HEIGHT];
-static int head = 0;
-static int tail = 0;
-
-static void queue_push(int x, int y) {
-    if (tail < (MAP_WIDTH * MAP_HEIGHT)) {
-        queue[tail].x = x;
-        queue[tail].y = y;
-        tail++;
-    }
-}
-
-static Point queue_pop() {
-    Point p = queue[head++];
-    return p;
-}
-
-static int is_queue_empty() {
-    return head == tail;
+static void debug_print_point(const char* label, int map_x, int map_y) {
+    cout << label
+         << " map=(" << map_x << ", " << map_y << ")"
+         << " global=(" << get_global_x(map_x)
+         << ", " << get_global_y(map_y) << ")"
+         << endl;
 }
 
 static void restore_map() {
@@ -62,6 +49,10 @@ static void restore_map() {
 }
 
 static int do_floodfill(const char* map_filename) {
+
+    cout << "[floodfill] loading map: " << map_filename << endl;
+    cout << "[floodfill] start input map=(" << Xstart << ", " << Ystart << ")"
+         << " final input map=(" << Xfinal << ", " << Yfinal << ")" << endl;
     
     restore_map();
 
@@ -80,153 +71,244 @@ static int do_floodfill(const char* map_filename) {
             if (ch == EOF) break;
             
             mapData[y][x] = (char)ch;
-            // floodData[y][x] = -123;  // Toto pridava to cislo VYMAZAT
+            floodData[y][x] = -1;
         }
     }
     fclose(file);
 
-    struct pos_in_map
-    {
-        int x;
-        int y;
-    };
-
-    pos_in_map current_pos_;
-
-    mapData[Yfinal][Xfinal] = 'S';
-    mapData[Ystart][Xstart] = 'F';
-
-    int step = 1;
-    
-    while (mapData[current_pos_.y][current_pos_.x] != 'S')
-    {
-        // inkrementovanie susedov
-        if (mapData[current_pos_.y+1][current_pos_.x] != '0') mapData[current_pos_.y+1][current_pos_.x] += step; // hore
-        if (mapData[current_pos_.y-1][current_pos_.x] != '0') mapData[current_pos_.y-1][current_pos_.x] += step; // dole
-        if (mapData[current_pos_.y][current_pos_.x+1] != '0') mapData[current_pos_.y][current_pos_.x+1] += step; // vpravo
-        if (mapData[current_pos_.y][current_pos_.x-1] != '0') mapData[current_pos_.y][current_pos_.x-1] += step; // vlavo
-
+    if (Xfinal >= 0 && Xfinal < MAP_WIDTH && Yfinal >= 0 && Yfinal < MAP_HEIGHT) {
+        if (mapData[Yfinal][Xfinal] == '0') {
+            cout << "[floodfill] target cell is open at map=(" << Xfinal
+                 << ", " << Yfinal << ")" << endl;
+        } else {
+            cout << "[floodfill] target cell blocked at map=(" << Xfinal
+                 << ", " << Yfinal << ") value='" << mapData[Yfinal][Xfinal]
+                 << "'" << endl;
+            return 0;
+        }
+    } else {
+        cout << "[floodfill] target coordinates out of bounds" << endl;
+        return 0;
     }
 
+    if (Xstart >= 0 && Xstart < MAP_WIDTH && Ystart >= 0 && Ystart < MAP_HEIGHT) {
+        mapData[Ystart][Xstart] = 'S';
+    }
+
+    debug_print_point("[floodfill] start point", Xstart, Ystart);
+    debug_print_point("[floodfill] target point", Xfinal, Yfinal);
+
+    queue<Point> q;
+
+    floodData[Ystart][Xstart] = 0;
+    q.push({Xstart, Ystart});
+
+    cout << "[floodfill] BFS initialized from start cell" << endl;
+
+    int dx[] = {1,-1,0,0,1,1,-1,-1};
+    int dy[] = {0,0,1,-1,1,-1,1,-1};
+
+    bool found = false;
+
+    while (!q.empty()) {
+        Point current = q.front();
+        q.pop();
+
+        if (current.x == Xfinal && current.y == Yfinal) {
+            found = true;
+            break;
+        }
+
+        for (int i = 0; i < 4; i++) {
+            int nx = current.x + dx[i];
+            int ny = current.y + dy[i];
+            if (nx < 0 || ny < 0 || nx >= MAP_WIDTH || ny >= MAP_HEIGHT)
+                continue;
+            if (mapData[ny][nx] == '1' || mapData[ny][nx] == 'X')
+                continue;
+            if (floodData[ny][nx] != -1)
+                continue;
+            floodData[ny][nx] = floodData[current.y][current.x] + 1;
+            q.push({nx, ny});
+        }
+    }
     
-    return 1;
+    return found ? 1 : 0;
 }
 
 static float get_global_x(int map_x) {
-    // X length is 521cm (5.21m), Xstart is 210
     return (map_x - 210) * (5.21f / MAP_WIDTH);
 }
-
 static float get_global_y(int map_y) {
-    // Y length is 602cm (6.02m), Ystart is 50 from bottom left
-    // If map_y=0 is the top of the array, the distance from bottom is:
     int y_from_bottom = (MAP_HEIGHT - 1) - map_y;
     return (y_from_bottom - 50) * (6.02f / MAP_HEIGHT);
 }
 
-static void find_path(float* x_target_position, float* y_target_position, int* num_targets, int max_targets) {
+static void find_path(float* x_target_position,
+                      float* y_target_position,
+                      int* num_targets,
+                      int max_targets)
+{
     *num_targets = 0;
-    if (floodData[Ystart][Xstart] == -1) {
-        printf("No path found!\n");
+
+    cout << "[floodfill] backtracking path" << endl;
+
+    if (floodData[Yfinal][Xfinal] == -1) {
+        cout << "[floodfill] no path found" << endl;
         return;
     }
 
-    int current_x = Xstart;
-    int current_y = Ystart;
+    cout << "[floodfill] path exists, start backtrack from final cell" << endl;
+    debug_print_point("[floodfill] backtrack final", Xfinal, Yfinal);
+
+    int current_x = Xfinal;
+    int current_y = Yfinal;
+
     int last_dx = 0;
     int last_dy = 0;
 
-    int dx[] = { 0,  0, -1,  1};
-    int dy[] = {-1,  1,  0,  0};
-    
-    while ((current_x != Xfinal || current_y != Yfinal) && *num_targets < max_targets - 1) {
-        int current_dist = floodData[current_y][current_x];
-        int next_x = -1, next_y = -1;
-        int next_dx = 0, next_dy = 0;
-        
-        for (int i = 0; i < 4; i++) {
+    int dx[] = {0, 0, -1, 1};
+    int dy[] = {-1, 1, 0, 0};
+
+    // collect turn points in reverse order
+    while (!(current_x == Xstart &&
+             current_y == Ystart))
+    {
+        int current_dist =
+            floodData[current_y][current_x];
+
+        int next_x = -1;
+        int next_y = -1;
+
+        int next_dx = 0;
+        int next_dy = 0;
+
+        for (int i = 0; i < 4; i++) // i < 8
+        {
             int nx = current_x + dx[i];
             int ny = current_y + dy[i];
-            
-            if (nx >= 0 && nx < MAP_WIDTH && ny >= 0 && ny < MAP_HEIGHT) {
-                if (floodData[ny][nx] == current_dist - 1) {
-                    next_x = nx;
-                    next_y = ny;
-                    next_dx = dx[i];
-                    next_dy = dy[i];
-                    break;
-                }
+
+            if (nx < 0 || ny < 0 ||
+                nx >= MAP_WIDTH ||
+                ny >= MAP_HEIGHT)
+                continue;
+
+            if (floodData[ny][nx] ==
+                current_dist - 1)
+            {
+                next_x = nx;
+                next_y = ny;
+
+                next_dx = dx[i];
+                next_dy = dy[i];
+
+                break;
             }
         }
-        
-        if (next_x == -1) {
-            printf("Error backtracking path!\n");
-            break;
+
+        if (next_x == -1)
+        {
+            cout << "[floodfill] backtrack error at map=(" << current_x
+                 << ", " << current_y << ")" << endl;
+            return;
         }
-        
-        if ((last_dx != 0 || last_dy != 0) && (last_dx != next_dx || last_dy != next_dy)) {
-            x_target_position[*num_targets] = get_global_x(current_x);
-            y_target_position[*num_targets] = get_global_y(current_y);
-            (*num_targets)++;
+
+        // direction changed -> save waypoint
+        if ((last_dx != 0 || last_dy != 0) &&
+            (last_dx != next_dx ||
+             last_dy != next_dy))
+        {
+            if (*num_targets < max_targets)
+            {
+                cout << "[floodfill] waypoint " << *num_targets
+                     << " at map=(" << current_x << ", " << current_y << ")"
+                     << " global=(" << get_global_x(current_x)
+                     << ", " << get_global_y(current_y) << ")" << endl;
+
+                x_target_position[*num_targets] =
+                    get_global_x(current_x);
+
+                y_target_position[*num_targets] =
+                    get_global_y(current_y);
+
+                (*num_targets)++;
+            }
         }
-        
+
         last_dx = next_dx;
         last_dy = next_dy;
+
         current_x = next_x;
         current_y = next_y;
     }
-    
-    if (*num_targets < max_targets) {
-        x_target_position[*num_targets] = get_global_x(Xfinal);
-        y_target_position[*num_targets] = get_global_y(Yfinal);
+
+    // reverse turn points
+    for (int i = 0; i < *num_targets / 2; i++)
+    {
+        std::swap(
+            x_target_position[i],
+            x_target_position[*num_targets - 1 - i]);
+
+        std::swap(
+            y_target_position[i],
+            y_target_position[*num_targets - 1 - i]);
+    }
+
+    // shift all points right by 1
+    for (int i = *num_targets; i > 0; i--)
+    {
+        x_target_position[i] =
+            x_target_position[i - 1];
+
+        y_target_position[i] =
+            y_target_position[i - 1];
+    }
+
+    // insert START at beginning
+        cout << "[floodfill] start waypoint global=(" << get_global_x(Xstart)
+            << ", " << get_global_y(Ystart) << ")" << endl;
+//     x_target_position[0] = get_global_x(Xstart);
+//     y_target_position[0] = get_global_y(Ystart);
+// 
+//     (*num_targets)++;
+
+    // append FINAL
+    if (*num_targets < max_targets)
+    {
+        cout << "[floodfill] final waypoint global=(" << get_global_x(Xfinal)
+             << ", " << get_global_y(Yfinal) << ")" << endl;
+        x_target_position[*num_targets] =
+            get_global_x(Xfinal);
+
+        y_target_position[*num_targets] =
+            get_global_y(Yfinal);
+
         (*num_targets)++;
     }
 
-    for (int i = *num_targets; i < max_targets; i++) {
-        x_target_position[i] = get_global_x(Xfinal);
-        y_target_position[i] = get_global_y(Yfinal);
-    }
-    printf("Path updated with %d target points.\n", *num_targets);
-    // cout << "Path updated with " << *num_targets << " target points.\n";
-}
+    cout << "[floodfill] generated " << *num_targets << " waypoints" << endl;
 
-int run_floodfill(const char* map_filename, int x_final, int y_final, float* x_target_position, float* y_target_position, int* num_targets) {
+    for (int i = 0; i < *num_targets; i++) {
+        cout << "[floodfill] target[" << i << "] = ("
+             << x_target_position[i] << ", "
+             << y_target_position[i] << ")" << endl;
+    }
+}
+int run_floodfill(const char* map_filename, int x_start, int y_start, int x_final, int y_final, float* x_target_position, float* y_target_position, int* num_targets) {
+    Xstart = x_start;
+    Ystart = y_start;
     Xfinal = x_final;
     Yfinal = y_final;
+
+    cout << "[floodfill] run_floodfill request final=(" << Xfinal
+         << ", " << Yfinal << ")" << endl;
     
-
-
-
     if (do_floodfill(map_filename)) {
         find_path(x_target_position, y_target_position, num_targets, 50);
-
-        QString exePath = QApplication::applicationDirPath();
-        QString timestamp = QDateTime::currentDateTime().toString("yyyy-MM-dd_hh-mm-ss");
-        QString filename = QString("floodfill_debug_%1.txt").arg(timestamp);
-        QString filepath = QDir(exePath).filePath(QString("../../../RMR/maps/%1").arg(filename));
-
-        write_floodfill_data(filepath.toStdString().c_str());
+        cout << "[floodfill] run_floodfill success" << endl;
         return 1;
     }
     *num_targets = 0;
+    cout << "[floodfill] run_floodfill failed" << endl;
     return 0;
-}
-
-
-static void write_floodfill_data(const char* filename) {    
-    FILE* file = fopen(filename, "w");
-    if (!file) {
-        printf("Error: Could not open file %s for writing\n", filename);
-        return;
-    }
-    
-    for (int y = 0; y < MAP_HEIGHT; y++) {
-        for (int x = 0; x < MAP_WIDTH; x++) {
-            fprintf(file, "%5d ", floodData[y][x]);
-        }
-        fprintf(file, "\n");
-    }
-    
-    fclose(file);
-    printf("Floodfill data written to %s\n", filename);
 }

@@ -15,6 +15,11 @@ extern int Ystart;
 extern int Xfinal;
 extern int Yfinal;
 
+struct Point {
+    int x;
+    int y;
+};
+
 /**
  * Initializes the floodfill map and runs the floodfill algorithm from 
  * the (Xfinal, Yfinal) to (Xstart, Ystart). 
@@ -27,7 +32,7 @@ extern int Yfinal;
  * @param y_target_position Array to store computed path breaking points (global Y in meters)
  * @param num_targets Pointer to integer to store the number of computed points
  */
-int run_floodfill(const char* map_filename, int x_final, int y_final, float* x_target_position, float* y_target_position, int* num_targets);
+int run_floodfill(const char* map_filename, int x_start, int y_start, int x_final, int y_final, float* x_target_position, float* y_target_position, int* num_targets);
 static void write_floodfill_data(const char* output_filename);
 
 // Make room for breaking points calculation later

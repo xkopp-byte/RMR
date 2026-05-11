@@ -44,7 +44,7 @@ void robot::setTargetXY(double x_target, double y_target)
 {
     std::cout << "New target set: (" << x_target << ", " << y_target << ")" << std::endl;
 
-    // x_target_position[0] = x_target;
+    // x_target_position[0] = x_target;  // TOTO TU MUSI OSTAT KEBY POTREBUJEME VYPNUT FLOODFILL
     // y_target_position[0] = y_target;
     // num_targets = 1;
 
@@ -52,12 +52,16 @@ void robot::setTargetXY(double x_target, double y_target)
     int y_from_bottom = std::round(y_target * (MAP_HEIGHT / 6.02) + 50);
     int map_y = (MAP_HEIGHT - 1) - y_from_bottom;
 
-    // 1. Calculate path into temporary variables first
-    float temp_x[50] = {0}; // Ensure this matches your array's size from robot.h
+    float temp_x[50] = {0}; 
     float temp_y[50] = {0};
     int temp_num = 0;
 
-    run_floodfill("maps/finalMap.txt", map_x, map_y, temp_x, temp_y, &temp_num);
+    // Convert robot's CURRENT location to map indices
+    int start_map_x = std::round(x_position * (MAP_WIDTH / 5.21) + 210);
+    int start_y_from_bottom = std::round(y_position * (MAP_HEIGHT / 6.02) + 50);
+    int start_map_y = (MAP_HEIGHT - 1) - start_y_from_bottom;
+
+    run_floodfill("maps/finalMap.txt", start_map_x, start_map_y, map_x, map_y, temp_x, temp_y, &temp_num);
     
     {
         std::lock_guard<std::mutex> lock(target_mutex);
@@ -321,6 +325,7 @@ void robot::updateArcTrajectory()
         x_distance_to = x_target - x_position;
         y_distance_to = y_target - y_position;
         distance_to_target = sqrt(x_distance_to * x_distance_to + y_distance_to * y_distance_to);
+        angle_to_target = atan2(y_distance_to, x_distance_to);
         is_in_vicinity_of_target = false; // reset proximity flag for new target
         flag = false; 
         
@@ -425,7 +430,7 @@ void robot::updateArcTrajectory()
 
             if (fabs(heading_error) >= M_PI / 2.0)
             {
-                desired_forwardspeed = 0;
+                desired_forwardspeed = min_forward_speed; // desired_forwardspeed = 0;
             }
             else
             {
