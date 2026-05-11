@@ -48,18 +48,21 @@ void robot::setTargetXY(double x_target, double y_target)
     // y_target_position[0] = y_target;
     // num_targets = 1;
 
-    int map_x = std::round(x_target * (MAP_WIDTH / 5.21) + 210);
-    int y_from_bottom = std::round(y_target * (MAP_HEIGHT / 6.02) + 50);
-    int map_y = (MAP_HEIGHT - 1) - y_from_bottom;
+    int map_x = static_cast<int>(std::lround(x_target * (MAP_WIDTH / 5.21) + 50.0));
+    int map_y = static_cast<int>(std::lround(y_target * (MAP_HEIGHT / 6.02) + 210.0)); // int map_y = static_cast<int>(std::lround(y_target * (MAP_HEIGHT / 6.02) + 470.0));
+
+    // Optional safety clamp
+    map_x = std::clamp(map_x, 0, MAP_WIDTH - 1);
+    map_y = std::clamp(map_y, 0, MAP_HEIGHT - 1);
 
     float temp_x[50] = {0}; 
     float temp_y[50] = {0};
     int temp_num = 0;
 
-    // Convert robot's CURRENT location to map indices
-    int start_map_x = std::round(x_position * (MAP_WIDTH / 5.21) + 210);
-    int start_y_from_bottom = std::round(y_position * (MAP_HEIGHT / 6.02) + 50);
-    int start_map_y = (MAP_HEIGHT - 1) - start_y_from_bottom;
+    int start_map_x = static_cast<int>(std::lround(x_position * (MAP_WIDTH / 5.21) + 50.0));
+    int start_map_y = static_cast<int>(std::lround(y_position * (MAP_HEIGHT / 6.02) + 210.0)); // int start_map_y = static_cast<int>(std::lround(y_position * (MAP_HEIGHT / 6.02) + 470.0));
+    start_map_x = std::clamp(start_map_x, 0, MAP_WIDTH - 1);
+    start_map_y = std::clamp(start_map_y, 0, MAP_HEIGHT - 1);
 
     run_floodfill("maps/finalMap.txt", start_map_x, start_map_y, map_x, map_y, temp_x, temp_y, &temp_num);
     

@@ -8,11 +8,11 @@
 
 using namespace std;
 
-int Ystart = 210;
-// int Ystart = 470;
-int Xstart = 50;
-int Xfinal = 0;
-int Yfinal = 0;
+//int Ystart = 210;
+int Ystart; // = 470;
+int Xstart; // = 50;
+int Xfinal; // = 0;
+int Yfinal; // = 0;
 
 static char mapData[MAP_HEIGHT][MAP_WIDTH];
 static int  floodData[MAP_HEIGHT][MAP_WIDTH]; 
@@ -105,9 +105,31 @@ static int do_floodfill(const char* map_filename) {
 
     cout << "[floodfill] BFS initialized from start cell" << endl;
 
-    int dx[] = {1,-1,0,0,1,1,-1,-1};
-    int dy[] = {0,0,1,-1,1,-1,1,-1};
+    int dx[] = {1,-1,0,0};
+    int dy[] = {0,0,1,-1};
+    /*
+    why this?
+    // Check Right
+    int nx = current.x + 1;
+    int ny = current.y;
+    if (nx >= 0 && nx < MAP_WIDTH ...) { ... }
 
+    // Check Left
+    nx = current.x - 1;
+    ny = current.y;
+    if (nx >= 0 && nx < MAP_WIDTH ...) { ... }
+
+    // Check Down
+    nx = current.x;
+    ny = current.y + 1;
+    if (nx >= 0 && nx < MAP_WIDTH ...) { ... }
+
+    // Check Up
+    nx = current.x;
+    ny = current.y - 1;
+    if (nx >= 0 && nx < MAP_WIDTH ...) { ... }
+    this is why
+    */
     bool found = false;
 
     while (!q.empty()) {
@@ -137,11 +159,10 @@ static int do_floodfill(const char* map_filename) {
 }
 
 static float get_global_x(int map_x) {
-    return (map_x - 210) * (5.21f / MAP_WIDTH);
+    return (map_x - 50) * (5.21f / MAP_WIDTH);
 }
 static float get_global_y(int map_y) {
-    int y_from_bottom = (MAP_HEIGHT - 1) - map_y;
-    return (y_from_bottom - 50) * (6.02f / MAP_HEIGHT);
+    return (map_y - 210) * (6.02f / MAP_HEIGHT); // return (map_y - 470) * (6.02f / MAP_HEIGHT);
 }
 
 static void find_path(float* x_target_position,
@@ -183,7 +204,7 @@ static void find_path(float* x_target_position,
         int next_dx = 0;
         int next_dy = 0;
 
-        for (int i = 0; i < 4; i++) // i < 8
+        for (int i = 0; i < 4; i++)
         {
             int nx = current_x + dx[i];
             int ny = current_y + dy[i];
@@ -254,25 +275,6 @@ static void find_path(float* x_target_position,
             y_target_position[*num_targets - 1 - i]);
     }
 
-    // shift all points right by 1
-    for (int i = *num_targets; i > 0; i--)
-    {
-        x_target_position[i] =
-            x_target_position[i - 1];
-
-        y_target_position[i] =
-            y_target_position[i - 1];
-    }
-
-    // insert START at beginning
-        cout << "[floodfill] start waypoint global=(" << get_global_x(Xstart)
-            << ", " << get_global_y(Ystart) << ")" << endl;
-//     x_target_position[0] = get_global_x(Xstart);
-//     y_target_position[0] = get_global_y(Ystart);
-// 
-//     (*num_targets)++;
-
-    // append FINAL
     if (*num_targets < max_targets)
     {
         cout << "[floodfill] final waypoint global=(" << get_global_x(Xfinal)
@@ -294,11 +296,12 @@ static void find_path(float* x_target_position,
              << y_target_position[i] << ")" << endl;
     }
 }
-int run_floodfill(const char* map_filename, int x_start, int y_start, int x_final, int y_final, float* x_target_position, float* y_target_position, int* num_targets) {
-    Xstart = x_start;
-    Ystart = y_start;
+int run_floodfill(const char* map_filename, int x_start, int y_start, int x_final, int y_final, float* x_target_position, float* y_target_position, int* num_targets)
+{
     Xfinal = x_final;
     Yfinal = y_final;
+    Xstart = x_start;
+    Ystart = y_start;
 
     cout << "[floodfill] run_floodfill request final=(" << Xfinal
          << ", " << Yfinal << ")" << endl;
