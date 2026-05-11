@@ -5,6 +5,7 @@ set(SOURCES
     mapping.cpp
     mapvisualizer.cpp
     floodfill.cpp
+    monteCarlo.cpp
 )
 
 set(HEADERS
@@ -13,6 +14,7 @@ set(HEADERS
     mapping.h
     mapvisualizer.h
     floodfill.h
+    monteCarlo.h
 )
 
 if(NOT DISABLE_JOYSTICK)
