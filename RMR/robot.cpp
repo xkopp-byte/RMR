@@ -310,6 +310,12 @@ int robot::candidateDirection()
 
 void robot::updateArcTrajectory()
 {
+    if (num_targets == 0 || last_target_reached)
+    {
+        setSpeed(0, 0);
+        return;
+    }
+
     //tato vs chcena pozicia a checking ked sa tam dostane, ak sa tam dostane pojde na dalsiu poziciu, ak sa dostane na vsetky pozicie, tak zastavi a nic viac nebude robit
     double x_target = x_target_position[current_target_index];
     double y_target = y_target_position[current_target_index];
@@ -331,7 +337,7 @@ void robot::updateArcTrajectory()
         angle_to_target = atan2(y_distance_to, x_distance_to);
         is_in_vicinity_of_target = false; // reset proximity flag for new target
         flag = false; 
-        
+
         // if(current_target_index >= sizeof(x_target_position)/sizeof(x_target_position[0]))
         if(current_target_index >= num_targets || num_targets == 0)
         {
@@ -340,6 +346,7 @@ void robot::updateArcTrajectory()
             forwardspeed = 0;
             rotationspeed = 0;
             setSpeed(forwardspeed, rotationspeed);
+            cout << "FINAL DESTINATION REACHED!\n";
             return;
         }
     }
@@ -497,12 +504,12 @@ int robot::processThisRobot(const TKobukiData &robotdata)
             setSpeed(forwardspeed, rotationspeed);
         }
     }
-    cout << "target_position:" << std::endl;
-    for (int i = 0; i < num_targets; i++)
-    {
-        cout << " (" << x_target_position[i] << ", " << y_target_position[i] << ")" << std::endl;
-
-    }
+//     cout << "target_position:" << std::endl;
+//     for (int i = 0; i < num_targets; i++)
+//     {
+//         cout << " (" << x_target_position[i] << ", " << y_target_position[i] << ")" << std::endl;
+// 
+//     }
 
     // cout<<"\n";
     //synctimestamp = robotdata.Timestamp; na zadanie 3 
