@@ -7,6 +7,8 @@
 #include <stdio.h>
 #include <random>
 #include <cmath>
+// #include "rplidar.h"
+#include "librobot/librobot.h"
 
 
 class MonteCarlo {
@@ -20,6 +22,9 @@ public:
 
     std::atomic<bool> foundMyself;
 
+    void setActualVelocity(double forw_speed, double rot_speed);
+    void updateLidarData(const std::vector<LaserData>& lidarData);
+
 private:
     std::thread mc_thread;
     std::atomic<bool> stop_flag;
@@ -32,7 +37,14 @@ private:
     double mapMinY = -1.60;
     double mapMaxY = 5.21;
 
+    double forward_speed_;
+    double rotation_speed_;
 
+    double time_period_ = 1/40.0;
+
+    #define MAX_GENERATIONS 1000
+
+    std::vector<LaserData> currentLidarData_;
 
     struct Particle {
         double x;
@@ -52,11 +64,12 @@ private:
 
     char mapData[MAP_HEIGHT][MAP_WIDTH];
     
-
-
     void initParticlesGlobal(int num_particles);
+    void motionUpdate(double dx, double dy, double dtheta);
 
     double randDouble(double min, double max);
+    double randGaussian(double mean, double stddev);
+
     bool isFreeSpace(double x, double y);
 
     double normalizeAngle(double angle);

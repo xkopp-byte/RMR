@@ -527,6 +527,7 @@ int robot::processThisRobot(const TKobukiData &robotdata)
         ///posielame sem nezmysli.. pohrajte sa nech sem idu zmysluplne veci
         const uint32_t ts = robotdata.synctimestamp; 
         emit publishPosition(x_position, y_position, gyro_angle/100, obstacle_detected, ts);
+        emit publishSpeeds(forwardspeed, rotationspeed);
         ///toto neodporucam na nejake komplikovane struktury.signal slot robi kopiu dat. radsej vtedy posielajte
         /// prazdny signal a slot bude vykreslovat strukturu (vtedy ju musite mat samozrejme ako member premmennu v mainwindow.ak u niekoho najdem globalnu premennu,tak bude cistit bludisko zubnou kefkou.. kefku dodam)
         /// vtedy ale odporucam pouzit mutex, aby sa vam nestalo ze budete pocas vypisovania prepisovat niekde inde

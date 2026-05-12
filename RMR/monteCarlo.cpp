@@ -31,7 +31,14 @@ void MonteCarlo::findYourself() {
     }
     
 
-    loadMap("maps/finalMap.txt");
+    
+    if (!loadMap("maps/finalMap.txt"))
+    {
+        std::cout << "Map loading failed. Monte Carlo initialization stopped." << std::endl;
+        return;
+    }
+
+
     initParticlesGlobal(100);
 
     std::cout << "Particles initialized: " << particles.size() << std::endl;
@@ -77,7 +84,7 @@ bool MonteCarlo::loadMap(const char* map_filename)
             mapData[y][x] = (char)ch;
         }
     }
-
+    fclose(map_file);
     return true;
 }
 
@@ -90,11 +97,15 @@ void MonteCarlo::initParticlesGlobal(int num_particles)
     for (int i = 0; i < num_particles; i++)
     {
         Particle p;
-        do
+        for (int attempt = 0; attempt < MAX_GENERATIONS; attempt++)
         {
             p.x = randDouble(mapMinX, mapMaxX);
             p.y = randDouble(mapMinY, mapMaxY);
-        }   while (!isFreeSpace(p.x, p.y));
+            if (isFreeSpace(p.x, p.y))
+            {
+                break; // valid particle found
+            }
+        } 
         p.theta = randDouble(-M_PI, M_PI);
         p.weight = 1.0 / num_particles;
         p.is_valid_particle = true;
@@ -102,6 +113,27 @@ void MonteCarlo::initParticlesGlobal(int num_particles)
         particles.push_back(p);
     }
 }
+
+void MonteCarlo::motionUpdate(double dx, double dy, double dtheta)
+{
+    for (auto& p : particles)
+    {
+        if (!p.is_valid_particle)
+            continue;
+
+        p.x += dx + randGaussian(0, 0.01); // add some noise
+        p.y += dy + randGaussian(0, 0.01);
+        p.theta += dtheta + randGaussian(0, 0.005);
+
+        if (!isFreeSpace(p.x, p.y))
+        {
+            p.is_valid_particle = false; // mark as invalid if out of bounds
+        }
+    }
+    
+}
+
+
 
 
 
@@ -112,6 +144,15 @@ double MonteCarlo::randDouble(double min, double max)
     std::uniform_real_distribution<double> dis(min, max);
     return dis(gen);
 }
+
+double MonteCarlo::randGaussian(double mean, double stddev)
+{
+    static std::random_device rd;
+    static std::mt19937 gen(rd());
+    std::normal_distribution<double> dist(mean, stddev);
+    return dist(gen);
+}
+
 
 bool MonteCarlo::isFreeSpace(double x, double y)
 {
@@ -138,5 +179,25 @@ double normalizeAngle(double angle)
 }
 
 
+
+
+// SETTERS AND GETTERS
+
+void MonteCarlo::updateLidarData(const std::vector<LaserData>& lidarData)
+{
+    currentLidarData_ = lidarData;
+
+    // debug print
+    // std::cout << "Lidar data updated. Number of points: " << currentLidarData_.size() << std::endl;
+
+}
+
+void MonteCarlo::setActualVelocity(double forw_speed, double rot_speed)
+{
+    forward_speed_ = forw_speed;
+    rotation_speed_ = rot_speed;
+
+    // std::cout << "Actual velocity updated - Forward: " << forw_speed << " mm/s, Rotation: " << rot_speed << " deg/s" << std::endl;
+}
 
 

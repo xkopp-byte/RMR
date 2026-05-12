@@ -144,6 +144,13 @@ void MainWindow::on_pushButton_9_clicked() //start button
     visualizer_->show();
     #endif
 
+    connect(&_robot, &robot::publishLidar, this, [this](const std::vector<LaserData>& data) {
+        monteCarlo_.updateLidarData(data);
+    });
+
+    connect(&_robot, &robot::publishSpeeds, this, [this](double forw, double rot) {
+        monteCarlo_.setActualVelocity(forw, rot);
+    });
 
     connect(&_robot,SIGNAL(publishPosition(double,double,double, bool, uint32_t)),this, SLOT(setUiValues(double,double,double, bool, uint32_t)));
     connect(&_robot,SIGNAL(publishLidar(const std::vector<LaserData> &)),this,SLOT(paintThisLidar(const std::vector<LaserData> &)));

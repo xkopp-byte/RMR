@@ -4,6 +4,7 @@
 #include <QObject>
 #include <QWidget>
 #include <mutex>
+#include <tuple> 
 
 #ifndef DISABLE_OPENCV
 #include "opencv2/core/utility.hpp"
@@ -38,6 +39,11 @@ public:
 
   void setTargetXY(double x_target, double y_target);
 
+  double getForwardSpeed() const { return forwardspeed; }
+  double getRotationSpeed() const { return rotationspeed; }
+  tuple<double, double> getSpeeds() const { return {forwardspeed, rotationspeed}; }
+
+
 signals:
   void publishPosition(double x, double y, double z, bool obstacle_detected, uint32_t timestamp);
   void publishLidar(const std::vector<LaserData> &lidata);
@@ -47,6 +53,7 @@ signals:
 #ifndef DISABLE_SKELETON
   void publishSkeleton(const skeleton &skeledata);
 #endif
+  void publishSpeeds(double forward, double rotation);
 
 private:
   /// toto su vase premenne na vasu odometriu
