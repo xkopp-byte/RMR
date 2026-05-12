@@ -30,12 +30,12 @@ private:
     std::atomic<bool> stop_flag;
 
     // Map dimensions
-    #define MAP_WIDTH 604
-    #define MAP_HEIGHT 682
-    double mapMinX = 0;
-    double mapMaxX = 6.02;
-    double mapMinY = -1.60;
-    double mapMaxY = 5.21;
+    #define MAP_WIDTH 604 + 100
+    #define MAP_HEIGHT 682 + 100
+    double mapMinX = 0 - 50;
+    double mapMaxX = 6.02 + 50;
+    double mapMinY = -1.60 - 50;
+    double mapMaxY = 5.21 + 50;
 
     double forward_speed_;
     double rotation_speed_;
@@ -66,6 +66,9 @@ private:
     
     void initParticlesGlobal(int num_particles);
     void motionUpdate(double dx, double dy, double dtheta);
+
+    void roulette();
+    void cutoff();
 
     double randDouble(double min, double max);
     double randGaussian(double mean, double stddev);

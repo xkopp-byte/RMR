@@ -17,20 +17,13 @@ void MonteCarlo::startFindYourselfThread() {
     mc_thread = std::thread(&MonteCarlo::findYourself, this);
 }
 
-void MonteCarlo::findYourself() {
-    // // The logic of monteCarlo will be written later
-    // while (!stop_flag && !foundMyself) {
-    //     // Simulating the thread running and eventually setting foundMyself to true 
-    //     // will be added here later.
-    //     std::this_thread::sleep_for(std::chrono::milliseconds(100));
-    // }
-
+void MonteCarlo::findYourself() // hlavna slucka
+{
     if (stop_flag && foundMyself)
     {
         return;
     }
     
-
     
     if (!loadMap("maps/finalMap.txt"))
     {
@@ -54,6 +47,10 @@ void MonteCarlo::findYourself() {
     }
     std::cout << "Weight sum: " << sum << std::endl;
 
+    // fitness();
+//    roulette();
+//      cutoff();
+//  
 
 }
 
@@ -135,6 +132,75 @@ void MonteCarlo::motionUpdate(double dx, double dy, double dtheta)
 
 
 
+void MonteCarlo::roulette()
+{
+    int n = particles.size();
+    if (n == 0) return;
+    double max_weight = 0.0;
+    for (int i = 0; i < n; ++i)
+    {
+        particles[i].weight = 1.0 / (particles[i].error + 1e-6);
+        if (particles[i].weight > max_weight)
+        {
+            max_weight = particles[i].weight;
+        }
+    }
+
+    std::vector<Particle> new_particles;
+    new_particles.reserve(n);
+    int index = static_cast<int>(randDouble(0, n - 1));
+    double beta = 0.0;
+
+    for (int i = 0; i < n; ++i)
+    {
+        beta += randDouble(0, 2.0 * max_weight);
+        while (beta > particles[index].weight)
+        {
+            beta -= particles[index].weight;
+            index = (index + 1) % n;
+        }
+        new_particles.push_back(particles[index]);
+    }
+
+    particles = new_particles;
+
+    double weight_sum = 0.0;
+    for (int i = 0; i < n; ++i)
+    {
+        weight_sum += particles[i].weight;
+    }
+    if (weight_sum > 0)
+    {
+        for (int i = 0; i < n; ++i)
+        {
+            particles[i].weight /= weight_sum;
+        }
+    }
+}
+
+void MonteCarlo::cutoff()
+{
+    int num_particles = particles.size();
+    for (int i = 0; i < num_particles; ++i)
+    {
+        if (particles[i].weight > 10000.0)
+        {
+            for (int attempt = 0; attempt < MAX_GENERATIONS; attempt++)
+            {
+                particles[i].x = randDouble(mapMinX, mapMaxX);
+                particles[i].y = randDouble(mapMinY, mapMaxY);
+                if (isFreeSpace(particles[i].x, particles[i].y))
+                {
+                    break; // valid particle found
+                }
+            } 
+            particles[i].theta = randDouble(-M_PI, M_PI);
+            particles[i].weight = 1.0 / num_particles;
+            particles[i].is_valid_particle = true;
+            particles[i].error = 0.0;
+        }
+    }
+}
 
 
 double MonteCarlo::randDouble(double min, double max)
