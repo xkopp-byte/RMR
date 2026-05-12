@@ -38,6 +38,8 @@ MainWindow::MainWindow(QWidget *parent) :
 
 MainWindow::~MainWindow()
 {
+    monteCarlo_.stopThread(); 
+    std::cout << "Monte Carlo thread stopped." << std::endl;
     delete ui;
 }
 
@@ -247,7 +249,12 @@ void MainWindow::on_pushButton_clicked()
 #endif
 }
 
+void MainWindow::on_pushButton_11_clicked() // monte carlo start
+{
+    monteCarlo_.startFindYourselfThread();
+    std::cout << "Monte Carlo thread started.\n";
 
+}
 
 
 

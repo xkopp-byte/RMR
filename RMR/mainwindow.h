@@ -12,6 +12,8 @@
 #include <sys/types.h>
 #include <vector>
 
+#include "monteCarlo.h"
+
 // #include "ckobuki.h"
 // #include "rplidar.h"
 
@@ -64,6 +66,8 @@ private slots:
 
   void on_pushButton_10_clicked();
 
+  void on_pushButton_11_clicked();
+
   int paintThisLidar(const std::vector<LaserData> &laserData);
 #ifndef DISABLE_OPENCV
   int paintThisCamera(const cv::Mat &cameraData);
@@ -73,6 +77,7 @@ private slots:
 #endif
 private:
   robot _robot;
+  MonteCarlo monteCarlo_;
   //--skuste tu nic nevymazat... pridavajte co chcete, ale pri odoberani by sa
   // mohol stat nejaky drobny problem, co bude vyhadzovat chyby
   #ifndef DISABLE_MAPPING
