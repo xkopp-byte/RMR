@@ -10,6 +10,11 @@
 // #include "rplidar.h"
 #include "librobot/librobot.h"
 
+#include <QApplication>
+#include <QDir>
+#include <QDateTime>
+#include <QString>
+
 
 class MonteCarlo {
 public:
@@ -28,6 +33,10 @@ public:
 private:
     std::thread mc_thread;
     std::atomic<bool> stop_flag;
+
+    QString exePath;
+    QString filename;
+    QString filepath;
 
     // Map dimensions
     #define MAP_WIDTH 604 + 100
@@ -64,11 +73,21 @@ private:
 
     char mapData[MAP_HEIGHT][MAP_WIDTH];
     
+    // Distance Map dimensions (1 cell ~= 1 cm)
+    #define DISTANCE_MAP_WIDTH 704
+    #define DISTANCE_MAP_HEIGHT 782
+    int distanceMapData[DISTANCE_MAP_HEIGHT][DISTANCE_MAP_WIDTH];
+    bool loadDistanceMap(const char* map_filename);
+    void fitness();
+    std::pair<int, int> transform(const Particle& p, const LaserData& ray);
+    
     void initParticlesGlobal(int num_particles);
     void motionUpdate(double dx, double dy, double dtheta);
 
     void roulette();
     void cutoff();
+    void noise();
+    void move();
 
     double randDouble(double min, double max);
     double randGaussian(double mean, double stddev);

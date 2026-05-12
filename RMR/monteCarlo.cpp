@@ -2,7 +2,14 @@
 #include <iostream>
 #include <chrono>
 
-MonteCarlo::MonteCarlo() : foundMyself(true), stop_flag(false) {}
+
+MonteCarlo::MonteCarlo() : foundMyself(true), stop_flag(false)
+, exePath(QApplication::applicationDirPath())
+, filename(QString("distanceMap.txt"))
+, filepath(QDir(exePath).filePath(QString("../../../RMR/maps/%1").arg(filename)))
+{
+
+}
 
 MonteCarlo::~MonteCarlo() {
     stopThread();
@@ -17,40 +24,43 @@ void MonteCarlo::startFindYourselfThread() {
     mc_thread = std::thread(&MonteCarlo::findYourself, this);
 }
 
-void MonteCarlo::findYourself() // hlavna slucka
+void MonteCarlo::findYourself() // hlvna slucka
 {
-    if (stop_flag && foundMyself)
+    if (stop_flag)
     {
         return;
     }
     
     
-    if (!loadMap("maps/finalMap.txt"))
+    // if (!loadMap("maps/finalMap.txt"))
+    // {
+    //     std::cout << "Map loading failed. Monte Carlo initialization stopped." << std::endl;
+    //     return;
+    // }
+
+    if (!loadDistanceMap(filepath.toStdString().c_str()))
     {
-        std::cout << "Map loading failed. Monte Carlo initialization stopped." << std::endl;
+        std::cout << "Distance map loading failed. Monte Carlo initialization stopped." << std::endl;
         return;
     }
 
-
-    initParticlesGlobal(100);
+    initParticlesGlobal(500);
 
     std::cout << "Particles initialized: " << particles.size() << std::endl;
 
-    double sum = 0.0;
-    for (const auto& p : particles) 
+    while (!stop_flag) 
     {
-        sum += p.weight;
-        std::cout << "Particle " << &p - &particles[0] << " - x: " << p.x << ", y: " << p.y 
-                  << ", theta: " << p.theta << ", weight: " << p.weight 
-                  << ", valid: " << p.is_valid_particle 
-                  << ", error: " << p.error << std::endl;
-    }
-    std::cout << "Weight sum: " << sum << std::endl;
 
-    // fitness();
-//    roulette();
-//      cutoff();
-//  
+        fitness();
+        roulette();
+        cutoff();
+        noise();
+        move();
+        // std::cout << "Iteration complete. Best particle error: " 
+        //           << (particles.empty() ? 0 : particles[0].error) 
+        //           << std::endl;
+        std::cout << "X: " << particles[0].x << " Y: " << particles[0].y << " Theta: " << particles[0].theta << " Error: " << particles[0].error << std::endl;
+    }
 
 }
 
@@ -82,6 +92,31 @@ bool MonteCarlo::loadMap(const char* map_filename)
         }
     }
     fclose(map_file);
+    return true;
+}
+
+bool MonteCarlo::loadDistanceMap(const char* map_filename) 
+{
+    FILE* f = fopen(map_filename, "r");
+    if (!f) {
+        printf("Error: Could not open distance map file %s\n", map_filename);
+        return false;
+    }
+    else {
+        printf("Distance map file %s opened successfully\n", map_filename);
+    }
+
+    for (int y = 0; y < DISTANCE_MAP_HEIGHT; y++) {
+        for (int x = 0; x < DISTANCE_MAP_WIDTH; x++) {
+            int val;
+            if (fscanf(f, "%d", &val) == 1) {
+                distanceMapData[y][x] = val;
+            } else {
+                distanceMapData[y][x] = 0;
+            }
+        }
+    }
+    fclose(f);
     return true;
 }
 
@@ -128,6 +163,99 @@ void MonteCarlo::motionUpdate(double dx, double dy, double dtheta)
         }
     }
     
+}
+
+void MonteCarlo::noise()
+{
+    for (auto& p : particles)
+    {
+        // Add random Gaussian noise: ~1 cm for position, ~2 degrees for angle
+        p.x += randGaussian(0, 0.01);
+        p.y += randGaussian(0, 0.01);
+        p.theta += randGaussian(0, 0.035);
+        p.theta = normalizeAngle(p.theta);
+
+        if (!isFreeSpace(p.x, p.y))
+        {
+            p.weight = 1000000.0; // Mark as highly mistaken or reset via cutoff next loop
+            p.is_valid_particle = false;
+        }
+    }
+}
+
+void MonteCarlo::move()
+{
+    // time passed = 1/40th of a second
+    double dt = time_period_;
+    
+    // Convert velocities to correct metric units
+    // forwardspeed is in mm/s -> construct m/s
+    // rotationspeed is in deg/s -> construct rad/s
+    double forward_dist_m = (forward_speed_ / 1000.0) * dt; 
+    double rotation_dist_rad = (rotation_speed_ * M_PI / 180.0) * dt;
+
+    for (auto& p : particles)
+    {
+        // 1. Change angle of each particle
+        p.theta = normalizeAngle(p.theta + rotation_dist_rad);
+
+        // 2. Translate with the forward speed based on the new angle
+        p.x += forward_dist_m * cos(p.theta);
+        p.y += forward_dist_m * sin(p.theta);
+
+        if (!isFreeSpace(p.x, p.y))
+        {
+            p.weight = 1000000.0; // Mark as highly mistaken or reset via cutoff next loop
+            p.is_valid_particle = false;
+        }
+    }
+}
+
+
+std::pair<int, int> MonteCarlo::transform(const Particle& p, const LaserData& ray)
+{
+    // ray distance is in mm, convert to cm (since 1 cell = 1 cm)
+    double dist_cm = ray.scanDistance / 10.0;
+    
+    // ray angle is in degrees, increasing clockwise.
+    double ray_angle_rad = ray.scanAngle * M_PI / 180.0;
+    
+    // Top-left is 0,0 (Y goes down). This means clockwise is positive rotation.
+    double total_angle = normalizeAngle(p.theta + ray_angle_rad);
+
+    // p.x and p.y are assumed to be in meters from the top-left (0,0)
+    double x_cm = (p.x * 100.0) + dist_cm * cos(total_angle);
+    double y_cm = (p.y * 100.0) + dist_cm * sin(total_angle);
+
+    return {static_cast<int>(std::round(x_cm)), static_cast<int>(std::round(y_cm))};
+}
+
+void MonteCarlo::fitness()
+{
+    for (auto& p : particles)
+    {
+        double error_sum = 0.0;
+        
+        for (const auto& ray : currentLidarData_)
+        {
+            // Optional: ignore completely invalid 0 distance rays
+            if (ray.scanDistance < 1.0) continue;
+
+            std::pair<int, int> grid_coords = transform(p, ray);
+            int gx = grid_coords.first;
+            int gy = grid_coords.second;
+
+            if (gx < 0 || gx >= DISTANCE_MAP_WIDTH || gy < 0 || gy >= DISTANCE_MAP_HEIGHT)
+            {
+                error_sum += 200.0;
+            }
+            else
+            {
+                error_sum += distanceMapData[gy][gx];
+            }
+        }
+        p.error = error_sum;
+    }
 }
 
 
@@ -237,7 +365,7 @@ bool MonteCarlo::isFreeSpace(double x, double y)
 
 
 
-double normalizeAngle(double angle)
+double MonteCarlo::normalizeAngle(double angle)
 {
     while (angle > M_PI) angle -= 2.0 * M_PI;
     while (angle < -M_PI) angle += 2.0 * M_PI;
