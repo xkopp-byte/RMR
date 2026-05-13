@@ -37,6 +37,7 @@ public:
   // tato funkcia fyzicky posiela hodnoty do robota
   void setSpeed(double forw, double rots);
 
+  void setTargetXY_flood(double x_target, double y_target);
   void setTargetXY(double x_target, double y_target);
 
   double getForwardSpeed() const { return forwardspeed; }

@@ -80,20 +80,16 @@ private:
     bool loadDistanceMap(const char* map_filename);
     void fitness();
     std::pair<int, int> transform(const Particle& p, const LaserData& ray);
-    
     void initParticlesGlobal(int num_particles);
     void motionUpdate(double dx, double dy, double dtheta);
-
     void roulette();
     void cutoff();
     void noise();
     void move();
-
+    void printBestCoordinates();
     double randDouble(double min, double max);
     double randGaussian(double mean, double stddev);
-
     bool isFreeSpace(double x, double y);
-
     double normalizeAngle(double angle);
 };
 

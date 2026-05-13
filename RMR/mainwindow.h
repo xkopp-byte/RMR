@@ -49,6 +49,7 @@ public:
 
 private slots:
  void on_Set_XY_button_clicked();
+ void on_Set_XY_button_2_clicked();
  void on_pushButton_9_clicked();
 
   void on_pushButton_2_clicked();

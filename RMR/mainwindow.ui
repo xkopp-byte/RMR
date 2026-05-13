@@ -206,7 +206,7 @@
         <item row="2" column="1">
          <widget class="QPushButton" name="Set_XY_button">
           <property name="text">
-           <string>Set XY target</string>
+           <string>SetXY_no_floodfill</string>
           </property>
          </widget>
         </item>
@@ -284,6 +284,13 @@
          <widget class="QPushButton" name="pushButton_11">
           <property name="text">
            <string>MonteCarlo</string>
+          </property>
+         </widget>
+        </item>
+        <item row="2" column="0">
+         <widget class="QPushButton" name="Set_XY_button_2">
+          <property name="text">
+           <string>SetXY_floodfil</string>
           </property>
          </widget>
         </item>

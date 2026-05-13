@@ -32,7 +32,6 @@ void MonteCarlo::findYourself() // hlvna slucka
         return;
     }
     
-    
     // if (!loadMap("maps/finalMap.txt"))
     // {
     //     std::cout << "Map loading failed. Monte Carlo initialization stopped." << std::endl;
@@ -52,14 +51,10 @@ void MonteCarlo::findYourself() // hlvna slucka
     while (!stop_flag) 
     {
 // std::cout       <<  "FITNESSSSSSSSS------------------------------------------------\n\n";
-         std::cout << "X: " << particles[0].x
-          << " Y: " << particles[0].y
-          << " Theta: " << particles[0].theta
-          << " Error: " << std::fixed << std::setprecision(20) << particles[0].error
-          << std::defaultfloat
-          << std::endl;
+        
         cutoff();
         fitness();
+
         // for (int i = 0; i < particles.size(); i+=20)
         // {
         //     const auto& p = particles[i];
@@ -67,6 +62,7 @@ void MonteCarlo::findYourself() // hlvna slucka
         //     
         // }
         roulette();
+        printBestCoordinates();
         // std::cout       <<  "ROULETTTEEEEE------------------------------------------------\n\n";
 //         for (int i = 0; i < particles.size(); i+=20)
 //         {
@@ -176,14 +172,12 @@ void MonteCarlo::motionUpdate(double dx, double dy, double dtheta)
     {
         if (!p.is_valid_particle)
             continue;
-
         p.x += dx + randGaussian(0, 0.01); // add some noise
         p.y += dy + randGaussian(0, 0.01);
         p.theta += dtheta + randGaussian(0, 0.005);
-
         if (!isFreeSpace(p.x, p.y))
         {
-            p.is_valid_particle = false; // mark as invalid if out of bounds
+            p.is_valid_particle = false; 
         }
     }
     
@@ -193,15 +187,13 @@ void MonteCarlo::noise()
 {
     for (auto& p : particles)
     {
-        // Add random Gaussian noise: ~1 cm for position, ~2 degrees for angle
         p.x += randGaussian(0, 0.01);
         p.y += randGaussian(0, 0.01);
         p.theta += randGaussian(0, 0.035);
         p.theta = normalizeAngle(p.theta);
-
         if (!isFreeSpace(p.x, p.y))
         {
-            p.weight = 1000000.0; // Mark as highly mistaken or reset via cutoff next loop
+            p.error = 1000000.0;
             p.is_valid_particle = false;
         }
     }
@@ -209,27 +201,18 @@ void MonteCarlo::noise()
 
 void MonteCarlo::move()
 {
-    // time passed = 1/40th of a second
     double dt = time_period_;
-    
-    // Convert velocities to correct metric units
-    // forwardspeed is in mm/s -> construct cm/s (1 cell = 1 cm)
-    // rotationspeed is in deg/s -> construct rad/s
     double forward_dist_cm = (forward_speed_ / 10.0) * dt;
     double rotation_dist_rad = (rotation_speed_ * M_PI / 180.0) * dt;
 
     for (auto& p : particles)
     {
-        // 1. Change angle of each particle
         p.theta = normalizeAngle(p.theta + rotation_dist_rad);
-
-        // 2. Translate with the forward speed based on the new angle
         p.x += forward_dist_cm * cos(p.theta);
         p.y += forward_dist_cm * sin(p.theta);
-
         if (!isFreeSpace(p.x, p.y))
         {
-            p.weight = 1000000.0; // Mark as highly mistaken or reset via cutoff next loop
+            p.error = 1000000.0;
             p.is_valid_particle = false;
         }
     }
@@ -238,19 +221,11 @@ void MonteCarlo::move()
 
 std::pair<int, int> MonteCarlo::transform(const Particle& p, const LaserData& ray)
 {
-    // ray distance is in mm, convert to cm (since 1 cell = 1 cm)
     double dist_cm = ray.scanDistance / 10.0;
-    
-    // ray angle is in degrees, increasing clockwise.
     double ray_angle_rad = ray.scanAngle * M_PI / 180.0;
-    
-    // Top-left is 0,0 (Y goes down). This means clockwise is positive rotation.
     double total_angle = normalizeAngle(p.theta + ray_angle_rad);
-
-    // p.x and p.y are in cm cell coordinates from the top-left (0,0)
     double x_cm = p.x + dist_cm * cos(total_angle);
     double y_cm = p.y + dist_cm * sin(total_angle);
-
     return {static_cast<int>(std::round(x_cm)), static_cast<int>(std::round(y_cm))};
 }
 
@@ -259,10 +234,8 @@ void MonteCarlo::fitness()
     for (auto& p : particles)
     {
         double error_sum = 0.0;
-        
         for (const auto& ray : currentLidarData_)
         {
-            // Optional: ignore completely invalid 0 distance rays
             if (ray.scanDistance < 1.0) continue;
 
             std::pair<int, int> grid_coords = transform(p, ray);
@@ -302,7 +275,6 @@ void MonteCarlo::roulette()
     new_particles.reserve(n);
     int index = static_cast<int>(randDouble(0, n - 1));
     double beta = 0.0;
-
     for (int i = 0; i < n; ++i)
     {
         beta += randDouble(0, 2.0 * max_weight);
@@ -315,7 +287,6 @@ void MonteCarlo::roulette()
     }
 
     particles = new_particles;
-
     double weight_sum = 0.0;
     for (int i = 0; i < n; ++i)
     {
@@ -355,7 +326,7 @@ void MonteCarlo::cutoff()
         p.error = 0.0;
     };
 
-    const int random_purge_count = static_cast<int>(num_particles * 0.2);
+    const int random_purge_count = static_cast<int>(num_particles * 0.1);
     if (random_purge_count > 0)
     {
         static std::random_device rd;
@@ -406,8 +377,7 @@ bool MonteCarlo::isFreeSpace(double x, double y)
     int gy = static_cast<int>(std::round(y));
 
     if (gx < 0 || gx >= DISTANCE_MAP_WIDTH || gy < 0 || gy >= DISTANCE_MAP_HEIGHT)
-        return false; // Out of bounds
-
+        return false; 
     return distanceMapData[gy][gx] > 0;
 }
 
@@ -428,10 +398,6 @@ double MonteCarlo::normalizeAngle(double angle)
 void MonteCarlo::updateLidarData(const std::vector<LaserData>& lidarData)
 {
     currentLidarData_ = lidarData;
-
-    // debug print
-    // std::cout << "Lidar data updated. Number of points: " << currentLidarData_.size() << std::endl;
-
 }
 
 void MonteCarlo::setActualVelocity(double forw_speed, double rot_speed)
@@ -439,7 +405,36 @@ void MonteCarlo::setActualVelocity(double forw_speed, double rot_speed)
     forward_speed_ = forw_speed;
     rotation_speed_ = rot_speed;
 
-    // std::cout << "Actual velocity updated - Forward: " << forw_speed << " mm/s, Rotation: " << rot_speed << " deg/s" << std::endl;
+}
+
+void MonteCarlo::printBestCoordinates()
+{
+    double perror = 100000.0;
+    Particle* best_particle = nullptr;
+    
+    for (Particle p : particles)
+    {
+        if (!p.is_valid_particle) {
+            continue;
+        }
+        if (p.error < perror) {
+            perror = p.error;
+            best_particle = &p;
+        }
+    }
+    
+    if (best_particle != nullptr) {
+        double realy = best_particle->y;
+        double realx = best_particle->x;
+        realy = -realy/100 + 5.2;
+        realx = realx/100 - 1;
+        std::cout << "X: " << realx
+            << " Y: " << realy
+            << " Theta: " << best_particle->theta
+            << " Error: " << std::fixed << std::setprecision(3) << best_particle->error
+            << std::defaultfloat
+            << std::endl;
+    }
 }
 
 

@@ -211,14 +211,24 @@ void MainWindow::on_pushButton_4_clicked() //stop
 }
 
 void MainWindow::on_Set_XY_button_clicked()
-  {
+{
     double x_target = ui->set_X_target->value();
     double y_target = ui->set_Y_target->value();
-    
+
     // Send to robot (you need to check what method the robot class provides)
     std::cout << "Mainwindow: Setting target XY to (" << x_target << ", " << y_target << ")" << std::endl;
     _robot.setTargetXY(x_target, y_target); 
-  }
+}
+
+void MainWindow::on_Set_XY_button_2_clicked() // floodfill
+{
+    double x_target = ui->set_X_target->value();
+    double y_target = ui->set_Y_target->value();
+
+    // Send to robot (you need to check what method the robot class provides)
+    std::cout << "Mainwindow: Setting target XY to (" << x_target << ", " << y_target << ") with FLOODFILL" << std::endl;
+    _robot.setTargetXY_flood(x_target, y_target); 
+}
 
 void MainWindow::on_pushButton_10_clicked()
 {

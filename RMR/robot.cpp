@@ -40,7 +40,7 @@ void robot::initAndStartRobot(std::string ipaddress)
 
 }
 
-void robot::setTargetXY(double x_target, double y_target)
+void robot::setTargetXY_flood(double x_target, double y_target)
 {
     std::cout << "New target set: (" << x_target << ", " << y_target << ")" << std::endl;
 
@@ -83,6 +83,20 @@ void robot::setTargetXY(double x_target, double y_target)
 
     
     
+}
+
+void robot::setTargetXY(double x_target, double y_target)
+{
+    std::cout << "New target set: (" << x_target << ", " << y_target << ")" << std::endl;
+
+    {
+        std::lock_guard<std::mutex> lock(target_mutex);
+        x_target_position[0] = x_target; 
+        y_target_position[0] = y_target;
+        num_targets = 1;
+        last_target_reached = false;
+        current_target_index = 0;
+    }   
 }
 
 void robot::setSpeedVal(double forw, double rots)
