@@ -44,9 +44,9 @@ void robot::setTargetXY(double x_target, double y_target)
 {
     std::cout << "New target set: (" << x_target << ", " << y_target << ")" << std::endl;
 
-    // x_target_position[0] = x_target;  // TOTO TU MUSI OSTAT KEBY POTREBUJEME VYPNUT FLOODFILL
-    // y_target_position[0] = y_target;
-    // num_targets = 1;
+    x_target_position[0] = x_target;  // TOTO TU MUSI OSTAT KEBY POTREBUJEME VYPNUT FLOODFILL
+    y_target_position[0] = y_target;
+    num_targets = 1;
 
     int map_x = static_cast<int>(std::lround(x_target * (MAP_WIDTH / 5.21) + 50.0));
     int map_y = static_cast<int>(std::lround(y_target * (MAP_HEIGHT / 6.02) + 210.0)); // int map_y = static_cast<int>(std::lround(y_target * (MAP_HEIGHT / 6.02) + 470.0));
@@ -310,11 +310,11 @@ int robot::candidateDirection()
 
 void robot::updateArcTrajectory()
 {
-    if (num_targets == 0 || last_target_reached)
-    {
-        setSpeed(0, 0);
-        return;
-    }
+    // if (num_targets == 0 || last_target_reached)
+    // {
+    //     setSpeed(0, 0);
+    //     return;
+    // }
 
     //tato vs chcena pozicia a checking ked sa tam dostane, ak sa tam dostane pojde na dalsiu poziciu, ak sa dostane na vsetky pozicie, tak zastavi a nic viac nebude robit
     double x_target = x_target_position[current_target_index];

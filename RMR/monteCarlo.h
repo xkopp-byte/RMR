@@ -41,10 +41,10 @@ private:
     // Map dimensions
     #define MAP_WIDTH 604 + 100
     #define MAP_HEIGHT 682 + 100
-    double mapMinX = 0 - 50;
-    double mapMaxX = 6.02 + 50;
-    double mapMinY = -1.60 - 50;
-    double mapMaxY = 5.21 + 50;
+    double mapMinX = 50;
+    double mapMaxX = 654;
+    double mapMinY = 50;
+    double mapMaxY = 732;
 
     double forward_speed_;
     double rotation_speed_;

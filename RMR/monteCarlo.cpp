@@ -1,7 +1,8 @@
 #include "monteCarlo.h"
 #include <iostream>
 #include <chrono>
-
+#include <algorithm>
+#include <iomanip>
 
 MonteCarlo::MonteCarlo() : foundMyself(true), stop_flag(false)
 , exePath(QApplication::applicationDirPath())
@@ -44,22 +45,45 @@ void MonteCarlo::findYourself() // hlvna slucka
         return;
     }
 
-    initParticlesGlobal(500);
+    initParticlesGlobal(100);
 
     std::cout << "Particles initialized: " << particles.size() << std::endl;
 
     while (!stop_flag) 
     {
-
-        fitness();
-        roulette();
+// std::cout       <<  "FITNESSSSSSSSS------------------------------------------------\n\n";
+         std::cout << "X: " << particles[0].x
+          << " Y: " << particles[0].y
+          << " Theta: " << particles[0].theta
+          << " Error: " << std::fixed << std::setprecision(20) << particles[0].error
+          << std::defaultfloat
+          << std::endl;
         cutoff();
+        fitness();
+        // for (int i = 0; i < particles.size(); i+=20)
+        // {
+        //     const auto& p = particles[i];
+        //     std::cout << "X: " << p.x << " Y: " << p.y << " Theta: " << p.theta << " Error: " << p.error << std::endl;
+        //     
+        // }
+        roulette();
+        // std::cout       <<  "ROULETTTEEEEE------------------------------------------------\n\n";
+//         for (int i = 0; i < particles.size(); i+=20)
+//         {
+//             const auto& p = particles[i];
+// 
+//             std::cout << "Found myself! X: " << p.x << " Y: " << p.y << " Theta: " << p.theta << " Error: " << p.error << std::endl;
+//             
+//         
+//         }
         noise();
         move();
         // std::cout << "Iteration complete. Best particle error: " 
         //           << (particles.empty() ? 0 : particles[0].error) 
         //           << std::endl;
-        std::cout << "X: " << particles[0].x << " Y: " << particles[0].y << " Theta: " << particles[0].theta << " Error: " << particles[0].error << std::endl;
+        
+       
+       
     }
 
 }
@@ -189,9 +213,9 @@ void MonteCarlo::move()
     double dt = time_period_;
     
     // Convert velocities to correct metric units
-    // forwardspeed is in mm/s -> construct m/s
+    // forwardspeed is in mm/s -> construct cm/s (1 cell = 1 cm)
     // rotationspeed is in deg/s -> construct rad/s
-    double forward_dist_m = (forward_speed_ / 1000.0) * dt; 
+    double forward_dist_cm = (forward_speed_ / 10.0) * dt;
     double rotation_dist_rad = (rotation_speed_ * M_PI / 180.0) * dt;
 
     for (auto& p : particles)
@@ -200,8 +224,8 @@ void MonteCarlo::move()
         p.theta = normalizeAngle(p.theta + rotation_dist_rad);
 
         // 2. Translate with the forward speed based on the new angle
-        p.x += forward_dist_m * cos(p.theta);
-        p.y += forward_dist_m * sin(p.theta);
+        p.x += forward_dist_cm * cos(p.theta);
+        p.y += forward_dist_cm * sin(p.theta);
 
         if (!isFreeSpace(p.x, p.y))
         {
@@ -223,9 +247,9 @@ std::pair<int, int> MonteCarlo::transform(const Particle& p, const LaserData& ra
     // Top-left is 0,0 (Y goes down). This means clockwise is positive rotation.
     double total_angle = normalizeAngle(p.theta + ray_angle_rad);
 
-    // p.x and p.y are assumed to be in meters from the top-left (0,0)
-    double x_cm = (p.x * 100.0) + dist_cm * cos(total_angle);
-    double y_cm = (p.y * 100.0) + dist_cm * sin(total_angle);
+    // p.x and p.y are in cm cell coordinates from the top-left (0,0)
+    double x_cm = p.x + dist_cm * cos(total_angle);
+    double y_cm = p.y + dist_cm * sin(total_angle);
 
     return {static_cast<int>(std::round(x_cm)), static_cast<int>(std::round(y_cm))};
 }
@@ -247,7 +271,7 @@ void MonteCarlo::fitness()
 
             if (gx < 0 || gx >= DISTANCE_MAP_WIDTH || gy < 0 || gy >= DISTANCE_MAP_HEIGHT)
             {
-                error_sum += 200.0;
+                error_sum += 300.0;
             }
             else
             {
@@ -309,23 +333,51 @@ void MonteCarlo::roulette()
 void MonteCarlo::cutoff()
 {
     int num_particles = particles.size();
+    if (num_particles == 0)
+    {
+        return;
+    }
+
+    auto reset_particle = [&](Particle& p)
+    {
+        for (int attempt = 0; attempt < MAX_GENERATIONS; attempt++)
+        {
+            p.x = randDouble(mapMinX, mapMaxX);
+            p.y = randDouble(mapMinY, mapMaxY);
+            if (isFreeSpace(p.x, p.y))
+            {
+                break;
+            }
+        }
+        p.theta = randDouble(-M_PI, M_PI);
+        p.weight = 1.0 / num_particles;
+        p.is_valid_particle = true;
+        p.error = 0.0;
+    };
+
+    const int random_purge_count = static_cast<int>(num_particles * 0.2);
+    if (random_purge_count > 0)
+    {
+        static std::random_device rd;
+        static std::mt19937 gen(rd());
+        std::vector<int> indices;
+        indices.reserve(num_particles);
+        for (int i = 0; i < num_particles; ++i)
+        {
+            indices.push_back(i);
+        }
+        std::shuffle(indices.begin(), indices.end(), gen);
+        for (int i = 0; i < random_purge_count; ++i)
+        {
+            reset_particle(particles[indices[i]]);
+        }
+    }
+
     for (int i = 0; i < num_particles; ++i)
     {
-        if (particles[i].weight > 10000.0)
+        if (particles[i].error > 10000.0 || particles[i].error == 0.0)
         {
-            for (int attempt = 0; attempt < MAX_GENERATIONS; attempt++)
-            {
-                particles[i].x = randDouble(mapMinX, mapMaxX);
-                particles[i].y = randDouble(mapMinY, mapMaxY);
-                if (isFreeSpace(particles[i].x, particles[i].y))
-                {
-                    break; // valid particle found
-                }
-            } 
-            particles[i].theta = randDouble(-M_PI, M_PI);
-            particles[i].weight = 1.0 / num_particles;
-            particles[i].is_valid_particle = true;
-            particles[i].error = 0.0;
+            reset_particle(particles[i]);
         }
     }
 }
@@ -350,17 +402,13 @@ double MonteCarlo::randGaussian(double mean, double stddev)
 
 bool MonteCarlo::isFreeSpace(double x, double y)
 {
-    int map_x = static_cast<int>((x - mapMinX) / (mapMaxX - mapMinX) * MAP_WIDTH);
-    int map_y = static_cast<int>((y - mapMinY) / (mapMaxY - mapMinY) * MAP_HEIGHT);
+    int gx = static_cast<int>(std::round(x));
+    int gy = static_cast<int>(std::round(y));
 
-    if (map_x < 0 || map_x >= MAP_WIDTH || map_y < 0 || map_y >= MAP_HEIGHT)
+    if (gx < 0 || gx >= DISTANCE_MAP_WIDTH || gy < 0 || gy >= DISTANCE_MAP_HEIGHT)
         return false; // Out of bounds
 
-    if (mapData[map_y][map_x] == '0')
-    {
-        return true; // Free space
-    }
-    return false; // Occupied space
+    return distanceMapData[gy][gx] > 0;
 }
 
 
