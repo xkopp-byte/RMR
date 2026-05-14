@@ -43,7 +43,7 @@ public:
   double getForwardSpeed() const { return forwardspeed; }
   double getRotationSpeed() const { return rotationspeed; }
   tuple<double, double> getSpeeds() const { return {forwardspeed, rotationspeed}; }
-
+  void setOrigin(double new_x, double new_y);
 
 signals:
   void publishPosition(double x, double y, double z, bool obstacle_detected, uint32_t timestamp);
@@ -114,10 +114,10 @@ private:
   double Ki = 0.001*1.2;          // Integral gain
   double integral_error = 0; // Accumulated integral error
   double max_integral = 10; // Anti-windup limit
-  double max_rotation_speed = 2; // max rotation speed deg/s
+  double max_rotation_speed = 10; // max rotation speed deg/s
   double min_forward_speed = 40;   // minimum forward speed mm/s
-  double max_forward_speed = 300;  // maximum forward speed mm/s
-  double target_tolerance = 0.05;  // target reach tolerance sin meters
+  double max_forward_speed = 450;  // maximum forward speed mm/s
+  double target_tolerance = 0.10;  // target reach tolerance sin meters
 
   double threshold_mm = 850.0;
   double hysteresis_mm = 500.0;
@@ -186,5 +186,7 @@ private:
 #endif
   int useDirectCommands;
 };
+
+
 
 #endif // ROBOT_H

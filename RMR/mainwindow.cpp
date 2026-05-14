@@ -20,7 +20,7 @@ MainWindow::MainWindow(QWidget *parent) :
 {
 
     //tu je napevno nastavena ip. treba zmenit na to co ste si zadali do text boxu alebo nejaku inu pevnu. co bude spravna
-    ipaddress="127.0.0.1";//192.168.1.15 toto je na niektory realny robot.. na lokal budete davat "127.0.0.1"
+    ipaddress="192.168.1.12";// 192.168.1.12 toto je na niektory realny robot.. na lokal budete davat "127.0.0.1"
 
     ui->setupUi(this);
     datacounter=0;
@@ -207,6 +207,16 @@ void MainWindow::on_pushButton_5_clicked()//right
 void MainWindow::on_pushButton_4_clicked() //stop
 {
     _robot.setSpeed(0,0);
+
+}
+
+void MainWindow::on_SET_orig_clicked()
+{
+    double new_x = ui->set_orig_X->value(); // change 'set_X_orig' to your actual UI element name
+    double new_y = ui->set_orig_Y->value(); // change 'set_Y_orig' to your actual UI element name
+    
+    std::cout << "Mainwindow: Setting origin XY to (" << new_x << ", " << new_y << ")" << std::endl;
+    _robot.setOrigin(new_x, new_y); 
 
 }
 

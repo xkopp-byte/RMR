@@ -745,6 +745,11 @@ void robot::updateLidarSegments()
     }
 }
 
+void robot::setOrigin(double new_x, double new_y) {
+    x_position = new_x;
+    y_position = new_y;
+}
+
 bool robot::obstacleDetector(double distance_to_target, double angle_to_target)
 {
     const int segment_count = static_cast<int>(sizeof(lidar_segments) / sizeof(lidar_segments[0]));
@@ -838,3 +843,4 @@ int robot::processThisSkeleton(skeleton skeledata)
     return 0;
 }
 #endif
+
